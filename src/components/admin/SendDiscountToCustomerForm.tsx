@@ -38,12 +38,16 @@ export default function SendDiscountToCustomerForm({
     setSuccess(null);
     setLoading(true);
     try {
-      await sendPersonalizedDiscount(formData);
-      setSuccess(`Código enviado a ${email}`);
-      setEmail("");
-      setCustomerName("");
-    } catch (err: any) {
-      setError(err.message || "No se pudo enviar el código");
+      const result = await sendPersonalizedDiscount(formData);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        setSuccess(`Código enviado a ${email}`);
+        setEmail("");
+        setCustomerName("");
+      }
+    } catch {
+      setError("No se pudo enviar el código, intenta de nuevo");
     } finally {
       setLoading(false);
     }
@@ -98,6 +102,10 @@ export default function SendDiscountToCustomerForm({
         <div>
           <label className="label">Valor del descuento</label>
           <input className="input" name="value" type="number" step="0.01" min="0.01" required placeholder="Ej: 15" />
+        </div>
+        <div>
+          <label className="label">Cantidad de veces que se puede usar</label>
+          <input className="input" name="usage_limit" type="number" min="1" defaultValue={1} />
         </div>
         <div>
           <label className="label">Vence el (opcional)</label>

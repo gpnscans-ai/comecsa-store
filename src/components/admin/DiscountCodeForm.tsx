@@ -16,11 +16,8 @@ export default function DiscountCodeForm({ products }: { products: ProductOption
 
   async function handleSubmit(formData: FormData) {
     setError(null);
-    try {
-      await createDiscountCode(formData);
-    } catch (err: any) {
-      setError(err.message || "No se pudo crear el código");
-    }
+    const result = await createDiscountCode(formData);
+    if (result?.error) setError(result.error);
   }
 
   return (

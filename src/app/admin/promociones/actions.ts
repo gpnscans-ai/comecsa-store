@@ -68,7 +68,9 @@ export async function sendPromotion(formData: FormData) {
   revalidatePath("/admin/promociones");
 }
 
-export async function createDiscountCode(formData: FormData) {
+// Devuelve { error } en vez de lanzar: un throw en una Server Action se
+// reemplaza en producción por un mensaje genérico de Next.js sin detalle útil.
+export async function createDiscountCode(formData: FormData): Promise<{ error?: string }> {
   const supabase = await createServerSupabase();
 
   const code = String(formData.get("code") || "").trim().toUpperCase();
@@ -81,46 +83,53 @@ export async function createDiscountCode(formData: FormData) {
   const scope = String(formData.get("scope") || "all");
   const productIds = scope === "selected" ? (formData.getAll("product_ids") as string[]) : [];
 
-  if (!code) throw new Error("Ingresa un código");
-  if (!(value > 0)) throw new Error("Ingresa un valor de descuento válido");
-  if (type === "percentage" && value > 100) throw new Error("El porcentaje no puede ser mayor a 100");
-  if (scope === "selected" && productIds.length === 0) throw new Error("Selecciona al menos un producto o elige \"Todo el catálogo\"");
+  if (!code) return { error: "Ingresa un código" };
+  if (!(value > 0)) return { error: "Ingresa un valor de descuento válido" };
+  if (type === "percentage" && value > 100) return { error: "El porcentaje no puede ser mayor a 100" };
+  if (scope === "selected" && productIds.length === 0) {
+    return { error: 'Selecciona al menos un producto o elige "Todo el catálogo"' };
+  }
 
   const { data: created, error } = await supabase
     .from("discount_codes")
     .insert({ code, type, value, usage_limit, expires_at })
     .select("id")
     .single();
-  if (error) throw new Error(error.message.includes("duplicate") ? "Ya existe un código con ese nombre" : error.message);
+  if (error) return { error: error.message.includes("duplicate") ? "Ya existe un código con ese nombre" : error.message };
 
   if (productIds.length > 0) {
     const rows = productIds.map((pid) => ({ discount_code_id: created.id, product_id: pid }));
     const { error: linkError } = await supabase.from("discount_code_products").insert(rows);
-    if (linkError) throw new Error(linkError.message);
+    if (linkError) return { error: linkError.message };
   }
 
   revalidatePath("/admin/promociones");
+  return {};
 }
 
-export async function sendPersonalizedDiscount(formData: FormData) {
+export async function sendPersonalizedDiscount(formData: FormData): Promise<{ error?: string }> {
   const supabase = await createServerSupabase();
 
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const customerName = String(formData.get("customer_name") || "").trim();
   const type = String(formData.get("type") || "percentage") as DiscountType;
   const value = Number(formData.get("value") || 0);
+  const usageLimitRaw = String(formData.get("usage_limit") || "").trim();
+  const usage_limit = usageLimitRaw ? Math.max(1, Math.round(Number(usageLimitRaw))) : 1;
   const expiresRaw = String(formData.get("expires_at") || "").trim();
   const expires_at = expiresRaw ? new Date(`${expiresRaw}T23:59:59`).toISOString() : null;
   const scope = String(formData.get("scope") || "all");
   const productIds = scope === "selected" ? (formData.getAll("product_ids") as string[]) : [];
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Ingresa un correo válido");
-  if (!(value > 0)) throw new Error("Ingresa un valor de descuento válido");
-  if (type === "percentage" && value > 100) throw new Error("El porcentaje no puede ser mayor a 100");
-  if (scope === "selected" && productIds.length === 0) throw new Error("Selecciona al menos un producto o elige \"Todo el catálogo\"");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Ingresa un correo válido" };
+  if (!(value > 0)) return { error: "Ingresa un valor de descuento válido" };
+  if (type === "percentage" && value > 100) return { error: "El porcentaje no puede ser mayor a 100" };
+  if (scope === "selected" && productIds.length === 0) {
+    return { error: 'Selecciona al menos un producto o elige "Todo el catálogo"' };
+  }
 
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("Falta configurar RESEND_API_KEY");
+  if (!apiKey) return { error: "Falta configurar RESEND_API_KEY" };
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://comecsa-store.netlify.app";
 
   // Genera un código único, reintentando si por casualidad ya existe.
@@ -130,23 +139,23 @@ export async function sendPersonalizedDiscount(formData: FormData) {
     code = `VIP${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     const { data: created, error } = await supabase
       .from("discount_codes")
-      .insert({ code, type, value, usage_limit: 1, expires_at, issued_to_email: email })
+      .insert({ code, type, value, usage_limit, expires_at, issued_to_email: email })
       .select("id")
       .single();
     if (!error && created) {
       createdId = created.id;
       break;
     }
-    if (error && !error.message.includes("duplicate")) throw new Error(error.message);
+    if (error && !error.message.includes("duplicate")) return { error: error.message };
   }
-  if (!createdId) throw new Error("No se pudo generar un código único, intenta de nuevo");
+  if (!createdId) return { error: "No se pudo generar un código único, intenta de nuevo" };
 
   let scopedProductNames: string[] = [];
   if (productIds.length > 0) {
     const { error: linkError } = await supabase
       .from("discount_code_products")
       .insert(productIds.map((pid) => ({ discount_code_id: createdId, product_id: pid })));
-    if (linkError) throw new Error(linkError.message);
+    if (linkError) return { error: linkError.message };
 
     const { data: scopedProducts } = await supabase.from("products").select("name").in("id", productIds);
     scopedProductNames = (scopedProducts || []).map((p) => p.name);
@@ -154,6 +163,7 @@ export async function sendPersonalizedDiscount(formData: FormData) {
 
   const discountLabel = type === "percentage" ? `${value}% de descuento` : `${formatUSD(value)} de descuento`;
   const scopeLabel = scopedProductNames.length > 0 ? `en: ${scopedProductNames.join(", ")}` : "en toda la tienda";
+  const usesLabel = usage_limit === 1 ? "Este código es personal, de un solo uso." : `Este código es personal, se puede usar hasta ${usage_limit} veces.`;
 
   const html = `
     <p>¡Hola${customerName ? ` ${escapeHtml(customerName)}` : ""}!</p>
@@ -161,7 +171,7 @@ export async function sendPersonalizedDiscount(formData: FormData) {
     <p style="font-size:24px;font-weight:bold;letter-spacing:2px;background:#f2f0fa;color:#2D1B69;padding:12px 20px;border-radius:8px;display:inline-block;">${code}</p>
     <p>Ingresa este código en el carrito de <a href="${siteUrl}">${siteUrl}</a> antes de pagar.</p>
     ${expires_at ? `<p style="font-size:13px;color:#888;">Válido hasta el ${new Date(expires_at).toLocaleDateString("es-EC")}.</p>` : ""}
-    <p style="font-size:13px;color:#888;">Este código es personal, de un solo uso.</p>
+    <p style="font-size:13px;color:#888;">${usesLabel}</p>
   `;
 
   const res = await fetch("https://api.resend.com/emails", {
@@ -177,10 +187,11 @@ export async function sendPersonalizedDiscount(formData: FormData) {
 
   if (!res.ok) {
     console.error("Resend personalized discount error", res.status, await res.text());
-    throw new Error("El código se creó pero no se pudo enviar el correo. Revisa la configuración de Resend.");
+    return { error: "El código se creó pero no se pudo enviar el correo. Revisa la configuración de Resend." };
   }
 
   revalidatePath("/admin/promociones");
+  return {};
 }
 
 export async function toggleDiscountCode(formData: FormData) {
