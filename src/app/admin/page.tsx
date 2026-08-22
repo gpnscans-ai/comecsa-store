@@ -1,11 +1,12 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatUSD, formatDate } from "@/lib/utils";
 import { ORDER_STATUS_FLOW, ORDER_STATUS_LABEL, type CustomerChannel, type Order } from "@/types/database";
-import { CHANNEL_COLOR, STATUS_COLOR } from "@/lib/chartColors";
+import { CHANNEL_COLOR, STATUS_COLOR, CATEGORICAL_PALETTE } from "@/lib/chartColors";
 import Link from "next/link";
 import DonutChart from "@/components/admin/charts/DonutChart";
 import BarChart from "@/components/admin/charts/BarChart";
 import PipelineChart from "@/components/admin/charts/PipelineChart";
+import HorizontalBarChart from "@/components/admin/charts/HorizontalBarChart";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,8 @@ async function getStats() {
     { data: allOrders },
     { data: customers },
     { data: revenuePayments },
+    { data: sellers },
+    { data: sellerOrders },
   ] = await Promise.all([
     supabase.from("customer_balances").select("*").order("total_balance_due", { ascending: false }).limit(6),
     supabase.from("payments").select("amount").gte("paid_at", startOfMonth.toISOString()),
@@ -55,6 +58,13 @@ async function getStats() {
     supabase.from("orders").select("status"),
     supabase.from("customers").select("channel"),
     supabase.from("payments").select("amount, paid_at").gte("paid_at", sixMonthsAgo.toISOString()),
+    supabase.from("sellers").select("id, full_name").eq("active", true).order("full_name"),
+    supabase
+      .from("orders")
+      .select("seller_id, price_usd")
+      .not("seller_id", "is", null)
+      .neq("status", "cancelado")
+      .gte("created_at", startOfMonth.toISOString()),
   ]);
 
   const monthlyRevenue = (monthPayments || []).reduce((sum, p: any) => sum + Number(p.amount), 0);
@@ -90,6 +100,17 @@ async function getStats() {
       .reduce((sum: number, p: any) => sum + Number(p.amount), 0)
   );
 
+  const salesBySeller = new Map<string, number>();
+  for (const o of sellerOrders || []) {
+    const key = o.seller_id as string;
+    salesBySeller.set(key, (salesBySeller.get(key) || 0) + Number(o.price_usd));
+  }
+  const sellerBars = (sellers || []).map((s: any, i: number) => ({
+    label: s.full_name,
+    value: salesBySeller.get(s.id) || 0,
+    color: CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length],
+  }));
+
   return {
     balances: balances || [],
     monthlyRevenue,
@@ -102,6 +123,7 @@ async function getStats() {
     channelData,
     monthLabels,
     revenueByMonth,
+    sellerBars,
   };
 }
 
@@ -144,6 +166,22 @@ export default async function AdminHome() {
             series={[{ label: "Ingresos", color: "#7259B8", values: stats.revenueByMonth }]}
             formatValue={(v) => formatUSD(v)}
           />
+        </div>
+      </div>
+
+      <div className="card p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Ventas por vendedor (este mes)</h2>
+          <Link href="/admin/vendedores" className="text-sm text-brand-400 hover:underline">
+            Ver detalle →
+          </Link>
+        </div>
+        <div className="mt-4">
+          {stats.sellerBars.length === 0 ? (
+            <p className="text-sm text-white/40">Aún no has registrado vendedores.</p>
+          ) : (
+            <HorizontalBarChart bars={stats.sellerBars} formatValue={(v) => formatUSD(v)} />
+          )}
         </div>
       </div>
 
