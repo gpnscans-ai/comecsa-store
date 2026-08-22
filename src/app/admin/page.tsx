@@ -43,6 +43,7 @@ async function getStats() {
     { data: revenuePayments },
     { data: sellers },
     { data: sellerOrders },
+    { data: monthOrderItems },
   ] = await Promise.all([
     supabase.from("customer_balances").select("*").order("total_balance_due", { ascending: false }).limit(6),
     supabase.from("payments").select("amount").gte("paid_at", startOfMonth.toISOString()),
@@ -63,6 +64,11 @@ async function getStats() {
       .from("orders")
       .select("seller_id, price_usd")
       .not("seller_id", "is", null)
+      .neq("status", "cancelado")
+      .gte("created_at", startOfMonth.toISOString()),
+    supabase
+      .from("orders")
+      .select("item_name")
       .neq("status", "cancelado")
       .gte("created_at", startOfMonth.toISOString()),
   ]);
@@ -111,6 +117,15 @@ async function getStats() {
     color: CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length],
   }));
 
+  const soldCounts = new Map<string, number>();
+  for (const o of monthOrderItems || []) {
+    soldCounts.set(o.item_name, (soldCounts.get(o.item_name) || 0) + 1);
+  }
+  const topProducts = Array.from(soldCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([label, value], i) => ({ label, value, color: CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length] }));
+
   return {
     balances: balances || [],
     monthlyRevenue,
@@ -124,6 +139,7 @@ async function getStats() {
     monthLabels,
     revenueByMonth,
     sellerBars,
+    topProducts,
   };
 }
 
@@ -169,21 +185,32 @@ export default async function AdminHome() {
         </div>
       </div>
 
-      <div className="card p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Ventas por vendedor (este mes)</h2>
-          <Link href="/admin/vendedores" className="text-sm text-brand-400 hover:underline">
-            Ver detalle →
-          </Link>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="card p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Ventas por vendedor (este mes)</h2>
+            <Link href="/admin/vendedores" className="text-sm text-brand-400 hover:underline">
+              Ver detalle →
+            </Link>
+          </div>
+          <div className="mt-4">
+            {stats.sellerBars.length === 0 ? (
+              <p className="text-sm text-white/40">Aún no has registrado vendedores.</p>
+            ) : (
+              <PipelineChart stages={stats.sellerBars} formatValue={(v) => formatUSD(v)} emptyLabel="Sin ventas asignadas este mes." />
+            )}
+          </div>
         </div>
-        <div className="mt-4">
-          {stats.sellerBars.length === 0 ? (
-            <p className="text-sm text-white/40">Aún no has registrado vendedores.</p>
+
+        <div className="card p-5">
+          <h2 className="mb-4 font-semibold">Artículos con mayor rotación (este mes)</h2>
+          {stats.topProducts.length === 0 ? (
+            <p className="text-sm text-white/40">Sin pedidos este mes todavía.</p>
           ) : (
             <BarChart
-              categories={stats.sellerBars.map((s) => s.label)}
-              series={[{ label: "Ventas", color: "#7259B8", values: stats.sellerBars.map((s) => s.value) }]}
-              formatValue={(v) => formatUSD(v)}
+              categories={stats.topProducts.map((p) => p.label)}
+              series={[{ label: "Unidades", color: "#7259B8", values: stats.topProducts.map((p) => p.value) }]}
+              formatValue={(v) => `${v} un.`}
             />
           )}
         </div>
