@@ -10,8 +10,8 @@ export default function BarChart({
   formatValue?: (v: number) => string;
 }) {
   const width = 560;
-  const height = 220;
-  const padding = { top: 16, right: 8, bottom: 28, left: 8 };
+  const height = 240;
+  const padding = { top: 16, right: 8, bottom: 56, left: 8 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
@@ -51,11 +51,13 @@ export default function BarChart({
               })}
               <text
                 x={groupX + groupW / 2}
-                y={height - padding.bottom + 16}
-                textAnchor="middle"
-                style={{ fontSize: 10, fill: "#ffffff66" }}
+                y={height - padding.bottom + 14}
+                textAnchor="end"
+                transform={`rotate(-35 ${groupX + groupW / 2} ${height - padding.bottom + 14})`}
+                style={{ fontSize: 10, fill: "#ffffff99" }}
               >
-                {cat}
+                <title>{cat}</title>
+                {cat.length > 16 ? `${cat.slice(0, 15)}…` : cat}
               </text>
             </g>
           );
