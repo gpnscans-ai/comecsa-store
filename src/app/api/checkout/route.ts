@@ -1,0 +1,206 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { createAdminSupabase } from "@/lib/supabase/admin";
+import { getStripe } from "@/lib/stripe";
+import { chargeKushkiToken, isKushkiConfigured } from "@/lib/kushki";
+import { preparePayphoneTransaction, isPayphoneConfigured } from "@/lib/payphone";
+
+// Precios fijos de envío definidos por el negocio (no se confía en el valor que mande el cliente).
+const DELIVERY_COSTS: Record<"retiro_tienda" | "domicilio", { cost: number; label: string }> = {
+  retiro_tienda: { cost: 0, label: "Retiro en tienda (La Libertad)" },
+  domicilio: { cost: 3, label: "Envío a domicilio" },
+};
+
+const bodySchema = z.object({
+  customer: z.object({
+    full_name: z.string().min(1),
+    whatsapp: z.string().min(6),
+    email: z.string().email().optional().or(z.literal("")).nullable(),
+    address: z.string().optional().nullable(),
+    city: z.string().optional().nullable(),
+  }),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        name: z.string().min(1),
+        priceUsd: z.number().positive(),
+        depositPct: z.number().min(0).max(100),
+        quantity: z.number().int().positive().max(20),
+      })
+    )
+    .min(1),
+  delivery: z
+    .object({
+      type: z.enum(["retiro_tienda", "domicilio"]),
+      cost: z.number().min(0).max(50),
+      label: z.string().min(1),
+    })
+    .optional()
+    .nullable(),
+  kushkiToken: z.string().optional().nullable(),
+});
+
+export async function POST(req: Request) {
+  try {
+    const json = await req.json();
+    const { customer, items, delivery, kushkiToken } = bodySchema.parse(json);
+
+    const supabase = createAdminSupabase();
+
+    // Busca cliente existente por WhatsApp, si no existe lo crea.
+    const { data: existing } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("whatsapp", customer.whatsapp)
+      .maybeSingle();
+
+    let customerId = existing?.id as string | undefined;
+
+    if (!customerId) {
+      const { data: created, error: customerError } = await supabase
+        .from("customers")
+        .insert({
+          full_name: customer.full_name,
+          whatsapp: customer.whatsapp,
+          email: customer.email || null,
+          address: customer.address || null,
+          city: customer.city || null,
+          channel: "tienda",
+        })
+        .select("id")
+        .single();
+      if (customerError) throw new Error(customerError.message);
+      customerId = created.id;
+    }
+
+    const orderIds: { orderId: string; depositAmount: number; name: string }[] = [];
+
+    for (const item of items) {
+      for (let i = 0; i < item.quantity; i++) {
+        const { data: order, error: orderError } = await supabase
+          .from("orders")
+          .insert({
+            customer_id: customerId,
+            product_id: item.productId,
+            item_name: item.name,
+            price_usd: item.priceUsd,
+            status: "pendiente",
+            source: "web",
+          })
+          .select("id")
+          .single();
+        if (orderError) throw new Error(orderError.message);
+
+        const depositAmount = Math.round(((item.priceUsd * item.depositPct) / 100) * 100) / 100;
+        orderIds.push({ orderId: order.id, depositAmount, name: item.name });
+      }
+    }
+
+    if (delivery) {
+      const authoritative = DELIVERY_COSTS[delivery.type];
+      const { data: shippingOrder, error: shippingError } = await supabase
+        .from("orders")
+        .insert({
+          customer_id: customerId,
+          product_id: null,
+          item_name: `Envío - ${authoritative.label}`,
+          price_usd: authoritative.cost,
+          status: "pendiente",
+          source: "web",
+        })
+        .select("id")
+        .single();
+      if (shippingError) throw new Error(shippingError.message);
+
+      // El envío se cobra completo (100%) en el checkout, no como abono.
+      orderIds.push({ orderId: shippingOrder.id, depositAmount: authoritative.cost, name: `Envío - ${authoritative.label}` });
+    }
+
+    const totalToCharge = Math.round(orderIds.reduce((s, o) => s + o.depositAmount, 0) * 100) / 100;
+
+    // --- Kushki: cobro síncrono con el token generado en el navegador ---
+    if (isKushkiConfigured() && kushkiToken) {
+      const result = await chargeKushkiToken(kushkiToken, totalToCharge);
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error || "El pago con Kushki fue rechazado" }, { status: 402 });
+      }
+
+      for (const o of orderIds) {
+        await supabase.from("payments").insert({
+          order_id: o.orderId,
+          amount: o.depositAmount,
+          method: "kushki",
+          stripe_session_id: result.ticketNumber ? `kushki:${result.ticketNumber}` : null,
+        });
+        await supabase.from("orders").update({ status: "confirmado" }).eq("id", o.orderId);
+      }
+
+      return NextResponse.json({ url: null, ok: true });
+    }
+
+    // --- PayPhone: checkout hospedado con redirección (si Kushki no está configurado) ---
+    if (isPayphoneConfigured()) {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+      const { data: session, error: sessionError } = await supabase
+        .from("checkout_sessions")
+        .insert({
+          provider: "payphone",
+          order_payments: orderIds.map((o) => ({ order_id: o.orderId, amount: o.depositAmount })),
+          total: totalToCharge,
+          status: "pending",
+        })
+        .select("id")
+        .single();
+      if (sessionError) throw new Error(sessionError.message);
+
+      const prepared = await preparePayphoneTransaction({
+        amountUsd: totalToCharge,
+        clientTransactionId: session.id,
+        reference: `COMECSA - ${orderIds.map((o) => o.name).join(", ")}`.slice(0, 100),
+        responseUrl: `${siteUrl}/api/payphone/callback`,
+      });
+
+      if (!prepared.ok) {
+        return NextResponse.json({ error: prepared.error || "No se pudo iniciar el pago con PayPhone" }, { status: 502 });
+      }
+
+      return NextResponse.json({ url: prepared.url });
+    }
+
+    // --- Stripe: checkout hospedado (usado si Kushki/PayPhone no están configurados) ---
+    const hasStripe = !!process.env.STRIPE_SECRET_KEY;
+
+    if (!hasStripe) {
+      return NextResponse.json({ url: null, orderIds: orderIds.map((o) => o.orderId) });
+    }
+
+    const stripe = getStripe();
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: orderIds.map((o) => ({
+        price_data: {
+          currency: "usd",
+          product_data: { name: `Abono - ${o.name}` },
+          unit_amount: Math.round(o.depositAmount * 100),
+        },
+        quantity: 1,
+      })),
+      success_url: `${siteUrl}/reserva-confirmada?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/carrito`,
+      customer_email: customer.email || undefined,
+      metadata: {
+        order_payments: JSON.stringify(orderIds.map((o) => ({ order_id: o.orderId, amount: o.depositAmount }))),
+      },
+    });
+
+    return NextResponse.json({ url: session.url });
+  } catch (err: any) {
+    console.error("checkout error", err);
+    return NextResponse.json({ error: err.message || "Error al procesar la reserva" }, { status: 400 });
+  }
+}

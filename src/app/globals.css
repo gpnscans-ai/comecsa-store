@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --page-bg: #f5f6fa;
+}
+
+body {
+  background-color: var(--page-bg);
+  color: #222222;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+}
+
+.card {
+  @apply rounded-2xl border border-ink-200 bg-white shadow-sm;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-full bg-brand-600 px-5 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center rounded-full border border-brand-600 bg-transparent px-5 py-2.5 font-semibold text-brand-600 transition hover:bg-brand-50;
+}
+
+.input {
+  @apply w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-700/40 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+}
+
+.label {
+  @apply mb-1 block text-xs font-medium uppercase tracking-wide text-ink-700/70;
+}
+
+/* =========================================================
+   Panel admin en oscuro (como Toychan) — solo dentro de .admin-dark
+   ========================================================= */
+.admin-dark {
+  @apply bg-ink-900 text-white;
+}
+
+.admin-dark .card {
+  @apply border-white/10 bg-ink-800;
+}
+
+.admin-dark .input {
+  @apply border-white/15 bg-ink-900 text-white placeholder:text-white/30 focus:border-brand-400 focus:ring-brand-400;
+}
+
+.admin-dark .btn-secondary {
+  @apply border-brand-400 text-brand-400 hover:bg-white/5;
+}
+
+.admin-dark .label {
+  @apply text-white/50;
+}
+
+.admin-dark .bg-white {
+  @apply bg-ink-900;
+}
+
+.admin-dark .text-ink-900 {
+  @apply text-white;
+}
+
+.admin-dark .text-ink-900\/70 {
+  @apply text-white/70;
+}
+
+.admin-dark .text-ink-800 {
+  @apply text-white/80;
+}
+
+.admin-dark .text-ink-700 {
+  @apply text-white/70;
+}
+
+.admin-dark .text-ink-700\/70 {
+  @apply text-white/60;
+}
+
+.admin-dark .text-ink-700\/60 {
+  @apply text-white/50;
+}
+
+.admin-dark .text-ink-700\/50 {
+  @apply text-white/40;
+}
+
+.admin-dark .text-ink-700\/40 {
+  @apply text-white/30;
+}
+
+.admin-dark .border-ink-200 {
+  @apply border-white/10;
+}
+
+.admin-dark .border-ink-100 {
+  @apply border-white/5;
+}
+
+.admin-dark .divide-ink-100 {
+  @apply divide-white/5;
+}
+
+.admin-dark .bg-ink-100 {
+  @apply bg-white/5;
+}
+
+.admin-dark .bg-ink-50 {
+  @apply bg-white/5;
+}
+
+.admin-dark .bg-brand-50 {
+  @apply bg-brand-500/10;
+}
+
+.admin-dark .text-brand-600 {
+  @apply text-brand-400;
+}
+
+.admin-dark .bg-brand-600\/15 {
+  @apply bg-brand-400/15;
+}
+
+.admin-dark .bg-amber-500\/5 {
+  @apply bg-amber-500/10;
+}
+
+.admin-dark .text-amber-200 {
+  @apply text-amber-300;
+}
+
+.admin-dark .text-sky-600 {
+  @apply text-sky-400;
+}
+
+.admin-dark .text-purple-600 {
+  @apply text-purple-400;
+}
+
+.admin-dark .text-indigo-600 {
+  @apply text-indigo-400;
+}
+
+.admin-dark .text-emerald-600 {
+  @apply text-emerald-400;
+}
+
+.admin-dark .text-emerald-500 {
+  @apply text-emerald-400;
+}
+
+.admin-dark .text-amber-600 {
+  @apply text-amber-400;
+}
+
+.admin-dark .text-red-500 {
+  @apply text-red-400;
+}
+
+.admin-dark .hover\:bg-ink-100:hover {
+  @apply bg-white/5;
+}
+
+.admin-dark .hover\:text-ink-900:hover {
+  @apply text-white;
+}
+
+.admin-dark .hover\:text-ink-900\/70:hover {
+  @apply text-white/70;
+}
+
+.admin-dark .hover\:text-brand-600:hover {
+  @apply text-brand-400;
+}
