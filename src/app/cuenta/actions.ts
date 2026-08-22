@@ -85,3 +85,74 @@ export async function signOutCustomer() {
   await supabase.auth.signOut();
   redirect("/");
 }
+
+export async function updateCustomerProfile(formData: FormData) {
+  const supabase = await createServerSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) redirect("/cuenta/login");
+
+  const payload = {
+    full_name: String(formData.get("full_name") || "").trim(),
+    whatsapp: String(formData.get("whatsapp") || "").trim() || null,
+    city: String(formData.get("city") || "").trim() || null,
+    address: String(formData.get("address") || "").trim() || null,
+  };
+
+  if (!payload.full_name) {
+    redirect(`/cuenta/datos?error=${encodeURIComponent("El nombre es obligatorio")}`);
+  }
+
+  const { error } = await supabase.from("customers").update(payload).eq("user_id", session.user.id);
+  if (error) {
+    redirect(`/cuenta/datos?error=${encodeURIComponent("No se pudo guardar: " + error.message)}`);
+  }
+
+  redirect("/cuenta/datos?ok=1");
+}
+
+export async function updateCustomerPassword(formData: FormData) {
+  const supabase = await createServerSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) redirect("/cuenta/login");
+
+  const password = String(formData.get("password") || "");
+  const confirmPassword = String(formData.get("confirm_password") || "");
+
+  if (password.length < 6) {
+    redirect(`/cuenta/password?error=${encodeURIComponent("La contraseña debe tener al menos 6 caracteres")}`);
+  }
+  if (password !== confirmPassword) {
+    redirect(`/cuenta/password?error=${encodeURIComponent("Las contraseñas no coinciden")}`);
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    redirect(`/cuenta/password?error=${encodeURIComponent(error.message)}`);
+  }
+
+  redirect("/cuenta/password?ok=1");
+}
+
+export async function updateCustomerEmail(formData: FormData) {
+  const supabase = await createServerSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) redirect("/cuenta/login");
+
+  const email = String(formData.get("email") || "").trim();
+  if (!email) {
+    redirect(`/cuenta/correo?error=${encodeURIComponent("Escribe un correo válido")}`);
+  }
+
+  const { error } = await supabase.auth.updateUser({ email });
+  if (error) {
+    redirect(`/cuenta/correo?error=${encodeURIComponent(error.message)}`);
+  }
+
+  redirect(`/cuenta/correo?ok=1`);
+}
