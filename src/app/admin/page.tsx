@@ -126,6 +126,14 @@ async function getStats() {
     .slice(0, 6)
     .map(([label, value], i) => ({ label, value, color: CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length] }));
 
+  const balanceBars = (balances || [])
+    .filter((b: any) => Number(b.total_balance_due) > 0)
+    .map((b: any, i: number) => ({
+      label: b.full_name,
+      value: Number(b.total_balance_due),
+      color: CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length],
+    }));
+
   return {
     balances: balances || [],
     monthlyRevenue,
@@ -140,6 +148,7 @@ async function getStats() {
     revenueByMonth,
     sellerBars,
     topProducts,
+    balanceBars,
   };
 }
 
@@ -223,23 +232,18 @@ export default async function AdminHome() {
         </div>
 
         <div className="card p-5">
-          <h2 className="mb-4 font-semibold">Clientes con mayor saldo pendiente</h2>
-          <div className="space-y-3">
-            {stats.balances.filter((b: any) => Number(b.total_balance_due) > 0).length === 0 && (
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Clientes con mayor saldo pendiente</h2>
+            <Link href="/admin/clientes" className="text-sm text-brand-400 hover:underline">
+              Ver todos →
+            </Link>
+          </div>
+          <div className="mt-4">
+            {stats.balanceBars.length === 0 ? (
               <p className="text-sm text-white/40">Sin saldos pendientes 🎉</p>
+            ) : (
+              <PipelineChart stages={stats.balanceBars} formatValue={(v) => formatUSD(v)} emptyLabel="Sin saldos pendientes 🎉" />
             )}
-            {stats.balances
-              .filter((b: any) => Number(b.total_balance_due) > 0)
-              .map((b: any) => (
-                <Link
-                  key={b.customer_id}
-                  href={`/admin/clientes/${b.customer_id}`}
-                  className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-white/5"
-                >
-                  <span className="text-sm">{b.full_name}</span>
-                  <span className="text-sm font-semibold text-brand-400">{formatUSD(b.total_balance_due)}</span>
-                </Link>
-              ))}
           </div>
         </div>
 
