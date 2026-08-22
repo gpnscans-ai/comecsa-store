@@ -258,6 +258,7 @@ export interface DiscountCode {
   usage_limit: number | null;
   times_used: number;
   expires_at: string | null;
+  issued_to_email: string | null;
   created_at: string;
   updated_at: string;
 }

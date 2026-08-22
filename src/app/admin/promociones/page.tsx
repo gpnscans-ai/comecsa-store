@@ -3,21 +3,24 @@ import { formatDate, formatUSD } from "@/lib/utils";
 import { DISCOUNT_TYPE_LABEL, type NewsletterCampaign } from "@/types/database";
 import { sendPromotion, toggleDiscountCode } from "./actions";
 import DiscountCodeForm from "@/components/admin/DiscountCodeForm";
+import SendDiscountToCustomerForm from "@/components/admin/SendDiscountToCustomerForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function PromocionesPage() {
   const supabase = await createServerSupabase();
 
-  const [{ count: activeCount }, { data: campaigns }, { data: discountCodes }, { data: products }] = await Promise.all([
-    supabase.from("newsletter_subscribers").select("id", { count: "exact", head: true }).eq("active", true),
-    supabase.from("newsletter_campaigns").select("*").order("sent_at", { ascending: false }).limit(20),
-    supabase
-      .from("discount_codes")
-      .select("*, discount_code_products(product:products(id, name))")
-      .order("created_at", { ascending: false }),
-    supabase.from("products").select("id, name").order("name"),
-  ]);
+  const [{ count: activeCount }, { data: campaigns }, { data: discountCodes }, { data: products }, { data: customers }] =
+    await Promise.all([
+      supabase.from("newsletter_subscribers").select("id", { count: "exact", head: true }).eq("active", true),
+      supabase.from("newsletter_campaigns").select("*").order("sent_at", { ascending: false }).limit(20),
+      supabase
+        .from("discount_codes")
+        .select("*, discount_code_products(product:products(id, name))")
+        .order("created_at", { ascending: false }),
+      supabase.from("products").select("id, name").order("name"),
+      supabase.from("customers").select("id, full_name, email").not("email", "is", null).order("full_name"),
+    ]);
 
   return (
     <div className="space-y-6">
@@ -92,6 +95,14 @@ export default async function PromocionesPage() {
         <DiscountCodeForm products={products || []} />
       </div>
 
+      <div className="card space-y-4">
+        <h2 className="font-display text-lg font-bold">Enviar código personalizado a un cliente</h2>
+        <p className="text-sm text-ink-700/60">
+          Genera un código exclusivo (un solo uso) y se lo envía por correo a un cliente específico.
+        </p>
+        <SendDiscountToCustomerForm products={products || []} customers={customers || []} />
+      </div>
+
       <div className="card overflow-x-auto">
         <h2 className="mb-3 font-display text-lg font-bold">Códigos existentes</h2>
         <table className="w-full text-sm">
@@ -100,6 +111,7 @@ export default async function PromocionesPage() {
               <th className="px-4 py-3">Código</th>
               <th className="px-4 py-3">Descuento</th>
               <th className="px-4 py-3">Aplica a</th>
+              <th className="px-4 py-3">Cliente</th>
               <th className="px-4 py-3">Usos</th>
               <th className="px-4 py-3">Vence</th>
               <th className="px-4 py-3">Estado</th>
@@ -119,6 +131,7 @@ export default async function PromocionesPage() {
                     ? c.discount_code_products.map((r: any) => r.product?.name).filter(Boolean).join(", ")
                     : "Todo el catálogo"}
                 </td>
+                <td className="px-4 py-3 text-ink-700/70">{c.issued_to_email || "—"}</td>
                 <td className="px-4 py-3 text-ink-700/70">
                   {c.times_used}
                   {c.usage_limit != null ? ` / ${c.usage_limit}` : ""}
@@ -142,7 +155,7 @@ export default async function PromocionesPage() {
             ))}
             {(!discountCodes || discountCodes.length === 0) && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-ink-700/50">Aún no has creado códigos de descuento.</td>
+                <td colSpan={8} className="px-4 py-8 text-center text-ink-700/50">Aún no has creado códigos de descuento.</td>
               </tr>
             )}
           </tbody>
