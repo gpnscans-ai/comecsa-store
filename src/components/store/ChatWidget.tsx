@@ -7,6 +7,28 @@ interface Message {
   content: string;
 }
 
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+const IS_URL_REGEX = /^https?:\/\//;
+
+function renderMessageContent(text: string, isUser: boolean) {
+  const parts = text.split(URL_REGEX);
+  return parts.map((part, i) =>
+    IS_URL_REGEX.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`underline ${isUser ? "text-white" : "text-brand-600"} hover:opacity-80`}
+      >
+        {part}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -71,7 +93,7 @@ export default function ChatWidget() {
                     m.role === "user" ? "bg-brand-600 text-white" : "bg-ink-100 text-ink-900"
                   }`}
                 >
-                  {m.content}
+                  {renderMessageContent(m.content, m.role === "user")}
                 </div>
               </div>
             ))}
