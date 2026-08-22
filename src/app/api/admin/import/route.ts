@@ -169,12 +169,16 @@ async function importFinanzas(admin: ReturnType<typeof createAdminSupabase>, row
     const type: FinanceType = typeRaw.toLowerCase().includes("ingreso") ? "ingreso" : "gasto";
     const dateStr = pick(row, "fecha", "entry_date", "date");
     const parsedDate = dateStr ? new Date(dateStr) : new Date();
+    const classRaw = pick(row, "clasificacion", "clasificación", "expense_class").toLowerCase();
+    const expense_class =
+      type === "gasto" ? (classRaw.includes("impuesto") ? "impuesto" : classRaw.includes("otro") ? "otro" : "operativo") : null;
     const payload = {
       type,
       category: pick(row, "categoria", "category") || "otro",
       description: pick(row, "descripcion", "description") || null,
       amount: Math.abs(toNumber(amountStr, 0)),
       entry_date: Number.isNaN(parsedDate.getTime()) ? new Date().toISOString().slice(0, 10) : parsedDate.toISOString().slice(0, 10),
+      expense_class,
     };
     const { error } = await admin.from("finance_entries").insert(payload);
     if (error) {

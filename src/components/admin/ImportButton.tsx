@@ -9,7 +9,7 @@ const COLUMNS_HINT: Record<ImportType, string> = {
   clientes: "nombre, correo, telefono, whatsapp, instagram, direccion, ciudad, canal, notas",
   productos: "nombre, categoria, estado, costo, margen, precio, abono, tallas, stock, publicado, imagen, link",
   vendedores: "nombre, comision, activo",
-  finanzas: "tipo (ingreso/gasto), categoria, descripcion, monto, fecha",
+  finanzas: "tipo (ingreso/gasto), clasificacion (operativo/otro/impuesto), categoria, descripcion, monto, fecha",
   pedidos: "cliente, whatsapp, producto, precio, estado, vendedor, notas",
   facturas: "cliente, identificacion, direccion, descripcion, cantidad, precio_unitario, notas",
 };

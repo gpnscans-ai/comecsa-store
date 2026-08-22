@@ -129,6 +129,7 @@ export async function GET(req: Request) {
     const gastosIngresos = (entries || []).map((e: any) => ({
       Fecha: e.entry_date,
       Tipo: e.type,
+      Clasificación: e.type === "gasto" ? e.expense_class || "operativo" : "",
       Categoría: e.category,
       Descripción: e.description || "",
       Monto: Number(e.amount),
@@ -138,6 +139,7 @@ export async function GET(req: Request) {
     const ventas = (payments || []).map((p: any) => ({
       Fecha: p.paid_at?.slice(0, 10) || "",
       Tipo: "ingreso",
+      Clasificación: "",
       Categoría: "venta",
       Descripción: `${p.order?.item_name || ""} - ${p.order?.customer?.full_name || ""} (${p.method})`,
       Monto: Number(p.amount),

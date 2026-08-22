@@ -107,6 +107,8 @@ export interface Payment {
   created_at: string;
 }
 
+export type ExpenseClass = "operativo" | "otro" | "impuesto";
+
 export interface FinanceEntry {
   id: string;
   type: FinanceType;
@@ -114,8 +116,15 @@ export interface FinanceEntry {
   description: string | null;
   amount: number;
   entry_date: string;
+  expense_class: ExpenseClass | null;
   created_at: string;
 }
+
+export const EXPENSE_CLASS_LABEL: Record<ExpenseClass, string> = {
+  operativo: "Gasto operativo",
+  otro: "Otro gasto",
+  impuesto: "Impuesto",
+};
 
 export interface OrderBalance {
   order_id: string;
