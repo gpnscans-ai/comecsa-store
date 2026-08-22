@@ -22,29 +22,32 @@ export async function POST(req: Request) {
   const supabase = await createServerSupabase();
   const { data: products } = await supabase
     .from("products")
-    .select("name, category, status, price_usd, deposit_pct, sizes")
+    .select("name, slug, category, status, price_usd, deposit_pct, sizes")
     .eq("is_published", true)
     .neq("status", "archivado")
     .limit(40);
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://comecsa-store.netlify.app";
+
   const catalogo = (products || [])
     .map(
       (p: any) =>
-        `- ${p.name} | categoría: ${p.category} | estado: ${p.status} | precio: $${p.price_usd} | abono para apartar: ${p.deposit_pct}%${p.sizes ? ` | tallas: ${p.sizes}` : ""}`
+        `- ${p.name} | categoría: ${p.category} | estado: ${p.status} | precio: $${p.price_usd} | abono para apartar: ${p.deposit_pct}%${p.sizes ? ` | tallas: ${p.sizes}` : ""} | link: ${siteUrl}/productos/${p.slug}`
     )
     .join("\n");
 
   const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 
-  const systemPrompt = `Eres el asistente virtual de COMECSA, una tienda ecuatoriana de ropa, calzado, accesorios y artículos para el hogar en La Libertad, Santa Elena.
+  const systemPrompt = `Eres el asistente de ventas de COMECSA, una tienda ecuatoriana de ropa, calzado, accesorios y artículos para el hogar en La Libertad, Santa Elena. Tu trabajo es ayudar a vender: ofrece productos del catálogo de forma proactiva, no solo esperes a que pregunten.
 Reglas:
 - Responde siempre en español, de forma breve, amigable y directa (2-4 frases máximo).
-- Puedes recomendar productos del catálogo actual, dar precios, tallas disponibles y explicar que se pueden apartar pagando un abono y el resto se paga al retirar o recibir el pedido.
-- Si preguntan por algo que no está en el catálogo, o quieren coordinar un pedido personalizado, pago, envío o reclamo, dile que escriba por WhatsApp al ${whatsapp ? `+${whatsapp}` : "número de contacto de la tienda"} para que COMECSA lo atienda directamente.
-- No inventes precios ni disponibilidad que no estén en el catálogo.
+- El catálogo de abajo trae el link real de cada producto (campo "link"). Cuando el cliente pida el link, pregunte por un producto o quiera verlo, DALE ese link directo — nunca digas que no tienes enlaces, sí los tienes.
+- Da precios, tallas y explica que se puede apartar con un abono (ver "abono para apartar") y pagar el resto al retirar o recibir el pedido.
+- Si preguntan por algo que claramente NO está en el catálogo, o quieren coordinar pago, envío, reclamo o algo muy personalizado, ahí sí dile que escriba por WhatsApp al ${whatsapp ? `+${whatsapp}` : "número de contacto de la tienda"}. Usa esto como último recurso, no como respuesta por defecto.
+- No inventes precios, links ni disponibilidad que no estén en el catálogo de abajo.
 - No pidas ni proceses datos de tarjetas o pagos por chat.
 
-Catálogo actual publicado:
+Catálogo actual publicado (nombre | categoría | estado | precio | abono | tallas | link):
 ${catalogo || "(sin productos publicados por ahora)"}`;
 
   const contents = [
