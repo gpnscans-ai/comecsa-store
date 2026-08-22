@@ -1,23 +1,45 @@
 import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatUSD } from "@/lib/utils";
-import { PRODUCT_STATUS_LABEL, PRODUCT_CATEGORY_LABEL, type Product } from "@/types/database";
+import {
+  PRODUCT_STATUS_LABEL,
+  PRODUCT_CATEGORY_LABEL,
+  type Product,
+  type ProductCategory,
+} from "@/types/database";
 import { archiveProduct } from "./actions";
 import ExportButton from "@/components/admin/ExportButton";
 import ImportButton from "@/components/admin/ImportButton";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductosPage() {
+const CATEGORY_KEYS = Object.keys(PRODUCT_CATEGORY_LABEL) as ProductCategory[];
+
+export default async function ProductosPage({ searchParams }: { searchParams: Promise<{ categoria?: string }> }) {
+  const { categoria: categoriaParam } = await searchParams;
+  const categoria = CATEGORY_KEYS.includes(categoriaParam as ProductCategory) ? (categoriaParam as ProductCategory) : null;
+
   const supabase = await createServerSupabase();
-  const { data: products } = await supabase.from("products").select("*").order("created_at", { ascending: false });
+  let query = supabase.from("products").select("*").order("created_at", { ascending: false });
+  if (categoria) query = query.eq("category", categoria);
+  const { data: products } = await query;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-bold">Catálogo</h1>
-          <p className="text-sm text-ink-700/60">Productos publicados en la tienda y control de costos.</p>
+          <h1 className="font-display text-2xl font-bold">
+            Catálogo{categoria && <span className="text-ink-700/50"> — {PRODUCT_CATEGORY_LABEL[categoria]}</span>}
+          </h1>
+          <p className="text-sm text-ink-700/60">
+            Productos publicados en la tienda y control de costos.
+            {categoria && (
+              <>
+                {" "}
+                <Link href="/admin/productos" className="text-brand-600 hover:underline">Quitar filtro</Link>
+              </>
+            )}
+          </p>
         </div>
         <div className="flex gap-2">
           <ExportButton type="productos" />
@@ -62,7 +84,11 @@ export default async function ProductosPage() {
               </tr>
             ))}
             {(!products || products.length === 0) && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-700/50">Aún no hay productos.</td></tr>
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-ink-700/50">
+                  {categoria ? `Aún no hay productos en ${PRODUCT_CATEGORY_LABEL[categoria]}.` : "Aún no hay productos."}
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

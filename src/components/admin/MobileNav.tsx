@@ -4,20 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/admin/login/actions";
-
-const NAV = [
-  { href: "/admin", label: "Resumen", icon: "📊" },
-  { href: "/admin/pedidos", label: "Pedidos", icon: "📦" },
-  { href: "/admin/clientes", label: "Clientes (CRM)", icon: "👥" },
-  { href: "/admin/productos", label: "Catálogo", icon: "🛍️" },
-  { href: "/admin/vendedores", label: "Vendedores", icon: "🧑‍💼" },
-  { href: "/admin/finanzas", label: "Finanzas", icon: "💰" },
-  { href: "/admin/facturas", label: "Facturas", icon: "🧾" },
-  { href: "/admin/configuracion", label: "Configuración", icon: "⚙️" },
-];
+import { ADMIN_NAV } from "@/lib/adminNav";
 
 export default function MobileNav() {
   const [open, setOpen] = useState(false);
+  const [openHref, setOpenHref] = useState<string | null>(null);
   const pathname = usePathname();
 
   return (
@@ -38,19 +29,57 @@ export default function MobileNav() {
 
       {open && (
         <nav className="space-y-1 border-t border-ink-200 px-4 py-3">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setOpen(false)}
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
-                pathname === item.href ? "bg-brand-600 text-white" : "text-ink-700 hover:bg-ink-100"
-              }`}
-            >
-              <span>{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
+          {ADMIN_NAV.map((item) => {
+            if (!item.children) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
+                    pathname === item.href ? "bg-brand-600 text-white" : "text-ink-700 hover:bg-ink-100"
+                  }`}
+                >
+                  <span>{item.icon}</span>
+                  {item.label}
+                </Link>
+              );
+            }
+
+            const isOpen = openHref === item.href || pathname === item.href;
+
+            return (
+              <div key={item.href}>
+                <button
+                  type="button"
+                  onClick={() => setOpenHref(isOpen ? null : item.href)}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${
+                    pathname === item.href ? "bg-brand-600 text-white" : "text-ink-700 hover:bg-ink-100"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>{item.icon}</span>
+                    {item.label}
+                  </span>
+                  <span className={`text-xs transition-transform ${isOpen ? "rotate-90" : ""}`}>›</span>
+                </button>
+                {isOpen && (
+                  <div className="ml-7 mt-1 space-y-0.5 border-l border-ink-200 pl-3">
+                    {item.children.map((child) => (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        onClick={() => setOpen(false)}
+                        className="block rounded-lg px-2 py-1.5 text-xs text-ink-700/70 hover:bg-ink-100 hover:text-ink-900"
+                      >
+                        {child.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           <Link href="/" onClick={() => setOpen(false)} className="block px-3 py-2 text-xs text-ink-700/50">
             ← Ver tienda pública
           </Link>
