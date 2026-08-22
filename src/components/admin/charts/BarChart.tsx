@@ -1,5 +1,28 @@
 type Series = { label: string; color: string; values: number[] };
 
+// Parte una etiqueta larga en hasta 2 líneas horizontales (sin inclinarla).
+function wrapLabel(text: string, maxCharsPerLine = 13, maxLines = 2) {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length > maxCharsPerLine && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+    if (lines.length === maxLines - 1 && current.length > maxCharsPerLine) {
+      current = `${current.slice(0, maxCharsPerLine - 1)}…`;
+      break;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.slice(0, maxLines);
+}
+
 export default function BarChart({
   categories,
   series,
@@ -52,12 +75,15 @@ export default function BarChart({
               <text
                 x={groupX + groupW / 2}
                 y={height - padding.bottom + 14}
-                textAnchor="end"
-                transform={`rotate(-35 ${groupX + groupW / 2} ${height - padding.bottom + 14})`}
+                textAnchor="middle"
                 style={{ fontSize: 10, fill: "#ffffff99" }}
               >
                 <title>{cat}</title>
-                {cat.length > 16 ? `${cat.slice(0, 15)}…` : cat}
+                {wrapLabel(cat).map((line, li) => (
+                  <tspan key={li} x={groupX + groupW / 2} dy={li === 0 ? 0 : 12}>
+                    {line}
+                  </tspan>
+                ))}
               </text>
             </g>
           );
