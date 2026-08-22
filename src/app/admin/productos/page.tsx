@@ -4,6 +4,7 @@ import { formatUSD } from "@/lib/utils";
 import { PRODUCT_STATUS_LABEL, PRODUCT_CATEGORY_LABEL, type Product } from "@/types/database";
 import { archiveProduct } from "./actions";
 import ExportButton from "@/components/admin/ExportButton";
+import ImportButton from "@/components/admin/ImportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function ProductosPage() {
         </div>
         <div className="flex gap-2">
           <ExportButton type="productos" />
+          <ImportButton type="productos" />
           <Link href="/admin/productos/nuevo" className="btn-primary">+ Nuevo producto</Link>
         </div>
       </div>

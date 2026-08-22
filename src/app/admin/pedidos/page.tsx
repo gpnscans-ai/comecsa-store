@@ -3,6 +3,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { formatUSD } from "@/lib/utils";
 import { ORDER_STATUS_FLOW, ORDER_STATUS_LABEL, type OrderStatus } from "@/types/database";
 import ExportButton from "@/components/admin/ExportButton";
+import ImportButton from "@/components/admin/ImportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
         </div>
         <div className="flex gap-2">
           <ExportButton type="pedidos" />
+          <ImportButton type="pedidos" />
           <Link href="/admin/pedidos/nuevo" className="btn-primary">+ Nuevo pedido</Link>
         </div>
       </div>

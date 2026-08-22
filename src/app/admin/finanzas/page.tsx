@@ -2,6 +2,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { formatUSD, formatDate } from "@/lib/utils";
 import { createFinanceEntry, deleteFinanceEntry } from "./actions";
 import ExportButton from "@/components/admin/ExportButton";
+import ImportButton from "@/components/admin/ImportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="flex flex-wrap gap-2">
           <ExportButton type="finanzas" />
+          <ImportButton type="finanzas" />
           <form className="flex gap-2">
             <input className="input" type="month" name="month" defaultValue={sp.month} />
             <button className="btn-secondary" type="submit">Ver mes</button>

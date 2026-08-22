@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatUSD, formatDate } from "@/lib/utils";
 import { INVOICE_DOC_TYPE_LABEL, INVOICE_STATUS_LABEL, type Invoice } from "@/types/database";
+import ImportButton from "@/components/admin/ImportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ export default async function FacturasPage() {
         </div>
         <div className="flex gap-2">
           <Link href="/admin/configuracion" className="btn-secondary">⚙ Datos del negocio</Link>
+          <ImportButton type="facturas" />
           <Link href="/admin/facturas/nueva" className="btn-primary">+ Nueva factura</Link>
         </div>
       </div>

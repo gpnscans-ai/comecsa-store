@@ -3,6 +3,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { formatUSD } from "@/lib/utils";
 import { archiveSeller } from "./actions";
 import type { Seller } from "@/types/database";
+import ImportButton from "@/components/admin/ImportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: P
             <input className="input" type="month" name="month" defaultValue={sp.month} />
             <button className="btn-secondary" type="submit">Ver mes</button>
           </form>
+          <ImportButton type="vendedores" />
           <Link href="/admin/vendedores/nuevo" className="btn-primary">+ Nuevo vendedor</Link>
         </div>
       </div>

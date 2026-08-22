@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatUSD } from "@/lib/utils";
 import ExportButton from "@/components/admin/ExportButton";
+import ImportButton from "@/components/admin/ImportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="flex gap-2">
           <ExportButton type="clientes" />
+          <ImportButton type="clientes" />
           <Link href="/admin/clientes/nuevo" className="btn-primary">+ Nuevo cliente</Link>
         </div>
       </div>
