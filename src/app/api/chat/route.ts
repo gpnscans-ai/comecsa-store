@@ -72,7 +72,7 @@ ${catalogo || "(sin productos publicados por ahora)"}`;
     if (!res.ok) {
       const errText = await res.text();
       console.error("Gemini error", res.status, errText);
-      return NextResponse.json({ error: "No se pudo contactar al asistente" }, { status: 502 });
+      return NextResponse.json({ error: "No se pudo contactar al asistente", debug: { status: res.status, body: errText } }, { status: 502 });
     }
 
     const data = await res.json();
