@@ -7,6 +7,7 @@ import { chargeKushkiToken, isKushkiConfigured } from "@/lib/kushki";
 import { preparePayphoneTransaction, isPayphoneConfigured } from "@/lib/payphone";
 import { validateDiscountCode } from "@/lib/discounts";
 import { computeCartPricing, getEffectiveUnitPrice } from "@/lib/promo";
+import { withIva, DEFAULT_IVA_PCT } from "@/lib/tax";
 
 // Precios fijos de envío definidos por el negocio (no se confía en el valor que mande el cliente).
 const DELIVERY_COSTS: Record<"retiro_tienda" | "domicilio", { cost: number; label: string }> = {
@@ -52,6 +53,9 @@ export async function POST(req: Request) {
     const { customer, items, delivery, kushkiToken, discountCode } = bodySchema.parse(json);
 
     const supabase = createAdminSupabase();
+
+    const { data: businessSettings } = await supabase.from("business_settings").select("iva_pct").eq("id", 1).maybeSingle();
+    const ivaPct = businessSettings?.iva_pct != null ? Number(businessSettings.iva_pct) : DEFAULT_IVA_PCT;
 
     // El precio y si el producto es 2x1 se leen del catálogo real, NUNCA del valor que
     // manda el navegador (evita que alguien fuerce un precio menor o un 2x1 inventado).
@@ -146,7 +150,9 @@ export async function POST(req: Request) {
       const item = pricedItems[itemIdx];
       for (let i = 0; i < item.quantity; i++) {
         const isFreeUnit = pricing.freeMap[itemIdx][i];
-        const unitPrice = isFreeUnit ? 0 : priceForItem(item.priceUsd, item.productId);
+        // El precio guardado en la orden ya incluye IVA: es lo que realmente se cobra
+        // y contra lo que se calculan abonos y saldos pendientes en todo el admin.
+        const unitPrice = isFreeUnit ? 0 : withIva(priceForItem(item.priceUsd, item.productId), ivaPct);
 
         const notes = [
           isFreeUnit ? "Unidad gratis (promo 2x1)" : null,
@@ -181,13 +187,14 @@ export async function POST(req: Request) {
 
     if (delivery) {
       const authoritative = DELIVERY_COSTS[delivery.type];
+      const shippingPriceWithIva = withIva(authoritative.cost, ivaPct);
       const { data: shippingOrder, error: shippingError } = await supabase
         .from("orders")
         .insert({
           customer_id: customerId,
           product_id: null,
           item_name: `Envío - ${authoritative.label}`,
-          price_usd: authoritative.cost,
+          price_usd: shippingPriceWithIva,
           status: "pendiente",
           source: "web",
         })
@@ -196,7 +203,7 @@ export async function POST(req: Request) {
       if (shippingError) throw new Error(shippingError.message);
 
       // El envío se cobra completo (100%) en el checkout, no como abono.
-      orderIds.push({ orderId: shippingOrder.id, depositAmount: authoritative.cost, name: `Envío - ${authoritative.label}` });
+      orderIds.push({ orderId: shippingOrder.id, depositAmount: shippingPriceWithIva, name: `Envío - ${authoritative.label}` });
     }
 
     const totalToCharge = Math.round(orderIds.reduce((s, o) => s + o.depositAmount, 0) * 100) / 100;

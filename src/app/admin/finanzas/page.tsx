@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatUSD, formatDate } from "@/lib/utils";
 import { createFinanceEntry, deleteFinanceEntry } from "./actions";
 import ExportButton from "@/components/admin/ExportButton";
 import ImportButton from "@/components/admin/ImportButton";
+import LineChart from "@/components/admin/charts/LineChart";
+import DonutChart from "@/components/admin/charts/DonutChart";
 import { EXPENSE_CLASS_LABEL, type ExpenseClass } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +15,31 @@ function monthRange(monthParam?: string) {
   const start = new Date(base.getFullYear(), base.getMonth(), 1);
   const end = new Date(base.getFullYear(), base.getMonth() + 1, 1);
   return { start, end, label: start.toLocaleDateString("es-EC", { month: "long", year: "numeric" }) };
+}
+
+async function monthSummary(supabase: Awaited<ReturnType<typeof createServerSupabase>>, start: Date, end: Date) {
+  const [{ data: soldOrders }, { data: entries }] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("price_usd, product:products(cost_usd)")
+      .not("product_id", "is", null)
+      .neq("status", "cancelado")
+      .gte("created_at", start.toISOString())
+      .lt("created_at", end.toISOString()),
+    supabase
+      .from("finance_entries")
+      .select("type, amount, expense_class")
+      .gte("entry_date", start.toISOString().slice(0, 10))
+      .lt("entry_date", end.toISOString().slice(0, 10)),
+  ]);
+
+  const ventas = (soldOrders || []).reduce((s, o: any) => s + Number(o.price_usd), 0);
+  const costoVentas = (soldOrders || []).reduce((s, o: any) => s + Number(o.product?.cost_usd || 0), 0);
+  const gastos = (entries || []).filter((e) => e.type === "gasto").reduce((s, e) => s + Number(e.amount), 0);
+  const otrosIngresos = (entries || []).filter((e) => e.type === "ingreso").reduce((s, e) => s + Number(e.amount), 0);
+  const utilidadNeta = ventas - costoVentas + otrosIngresos - gastos;
+
+  return { ventas, costoVentas, utilidadNeta };
 }
 
 export default async function FinanzasPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
@@ -58,6 +86,25 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
 
   const ventasCobradas = (payments || []).reduce((s, p) => s + Number(p.amount), 0);
 
+  // --- Tendencia de los últimos 6 meses (incluye el mes que se está viendo) ---
+  const monthsBack = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(start.getFullYear(), start.getMonth() - (5 - i), 1);
+    return { start: d, end: new Date(d.getFullYear(), d.getMonth() + 1, 1) };
+  });
+  const trend = await Promise.all(
+    monthsBack.map(async (m) => ({
+      label: m.start.toLocaleDateString("es-EC", { month: "short" }),
+      ...(await monthSummary(supabase, m.start, m.end)),
+    }))
+  );
+  const trendLabels = trend.map((t) => t.label);
+
+  const gastosPorClase = [
+    { label: "Operativo", value: gastosOperativos, color: "#7259B8" },
+    { label: "Otro", value: otrosGastos, color: "#38BDF8" },
+    { label: "Impuesto", value: impuestos, color: "#F472B6" },
+  ];
+
   const ESTADO_ROWS: { label: string; value: number; bold?: boolean; indent?: boolean; divider?: boolean }[] = [
     { label: "Ventas", value: ventas, bold: true },
     { label: "− Costo de ventas", value: -costoVentas, indent: true },
@@ -78,6 +125,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           <p className="text-sm capitalize text-ink-700/60">{label}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href="/admin/finanzas/proyeccion" className="btn-secondary">📈 Flujo de caja y evaluación</Link>
           <ExportButton type="finanzas" />
           <ImportButton type="finanzas" />
           <form className="flex gap-2">
@@ -134,6 +182,25 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="card lg:col-span-2 p-5">
+          <h2 className="mb-4 font-semibold">Ventas, costo de ventas y utilidad neta (últimos 6 meses)</h2>
+          <LineChart
+            categories={trendLabels}
+            series={[
+              { label: "Ventas", color: "#34D399", values: trend.map((t) => t.ventas) },
+              { label: "Costo de ventas", color: "#F87171", values: trend.map((t) => t.costoVentas) },
+              { label: "Utilidad neta", color: "#7259B8", values: trend.map((t) => t.utilidadNeta) },
+            ]}
+            formatValue={formatUSD}
+          />
+        </div>
+        <div className="card p-5">
+          <h2 className="mb-4 font-semibold">Gastos del mes por clasificación</h2>
+          <DonutChart data={gastosPorClase} title="gastos" />
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

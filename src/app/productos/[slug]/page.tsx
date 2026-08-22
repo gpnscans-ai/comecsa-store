@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 import Header from "@/components/store/Header";
 import WhatsAppButton from "@/components/store/WhatsAppButton";
 import ChatWidget from "@/components/store/ChatWidget";
 import AddToCartButton from "@/components/store/AddToCartButton";
 import { formatUSD, whatsappLink } from "@/lib/utils";
 import { getEffectiveUnitPrice, promoBadgeLabel } from "@/lib/promo";
+import { withIva, DEFAULT_IVA_PCT } from "@/lib/tax";
 import { PRODUCT_STATUS_LABEL, PRODUCT_CATEGORY_LABEL, type Product } from "@/types/database";
 
 export const revalidate = 60;
@@ -22,7 +24,12 @@ export default async function ProductoDetailPage({ params }: { params: Promise<{
 
   if (!product) notFound();
 
-  const effectivePrice = getEffectiveUnitPrice(product);
+  const admin = createAdminSupabase();
+  const { data: settings } = await admin.from("business_settings").select("iva_pct").eq("id", 1).maybeSingle();
+  const ivaPct = settings?.iva_pct != null ? Number(settings.iva_pct) : DEFAULT_IVA_PCT;
+
+  const effectivePrice = withIva(getEffectiveUnitPrice(product), ivaPct);
+  const originalPrice = withIva(product.price_usd, ivaPct);
   const badge = promoBadgeLabel(product);
   const hasPriceCut = product.promo_active && product.promo_type !== "2x1";
   const depositAmount = (effectivePrice * product.deposit_pct) / 100;
@@ -52,16 +59,17 @@ export default async function ProductoDetailPage({ params }: { params: Promise<{
             {hasPriceCut ? (
               <p className="flex items-baseline gap-3">
                 <span className="text-3xl font-extrabold text-brand-600">{formatUSD(effectivePrice)}</span>
-                <span className="text-lg text-ink-700/40 line-through">{formatUSD(product.price_usd)}</span>
+                <span className="text-lg text-ink-700/40 line-through">{formatUSD(originalPrice)}</span>
               </p>
             ) : (
               <p className="text-3xl font-extrabold text-brand-600">
-                {formatUSD(product.price_usd)}
+                {formatUSD(originalPrice)}
                 {product.promo_active && product.promo_type === "2x1" && (
                   <span className="ml-2 text-base font-normal text-ink-700/50">c/u — llévate 2 y paga 1</span>
                 )}
               </p>
             )}
+            <p className="text-xs text-ink-700/40">IVA {ivaPct}% incluido</p>
 
             {product.sizes && (
               <p className="text-sm text-ink-700/70">📏 Tallas/números disponibles: {product.sizes}</p>

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Header from "@/components/store/Header";
 import { useCart } from "@/components/store/CartContext";
 import { formatUSD } from "@/lib/utils";
+import { withIva, DEFAULT_IVA_PCT } from "@/lib/tax";
 import { createClient } from "@/lib/supabase/client";
 import KushkiCardForm from "@/components/store/KushkiCardForm";
 
@@ -39,6 +40,17 @@ export default function CarritoPage() {
   } | null>(null);
   const [discountError, setDiscountError] = useState<string | null>(null);
   const [discountLoading, setDiscountLoading] = useState(false);
+
+  const [ivaPct, setIvaPct] = useState(DEFAULT_IVA_PCT);
+
+  useEffect(() => {
+    fetch("/api/settings/iva")
+      .then((res) => res.json())
+      .then((data) => {
+        if (typeof data.iva_pct === "number") setIvaPct(data.iva_pct);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -99,7 +111,9 @@ export default function CarritoPage() {
   const originalToCharge = paymentMode === "completo" ? totalPrice : totalDeposit;
   const figurinesToCharge = Math.round((paymentMode === "completo" ? discountedTotalPrice : discountedTotalDeposit) * 100) / 100;
   const discountDisplayAmount = Math.round((originalToCharge - figurinesToCharge) * 100) / 100;
-  const totalDepositWithDelivery = figurinesToCharge + deliveryCost;
+  const subtotalSinIva = figurinesToCharge + deliveryCost;
+  const ivaAmount = Math.round(subtotalSinIva * (ivaPct / 100) * 100) / 100;
+  const totalDepositWithDelivery = Math.round((subtotalSinIva + ivaAmount) * 100) / 100;
 
   function customerIsValid() {
     return fullName.trim().length > 0 && whatsapp.trim().length >= 6;
@@ -211,7 +225,7 @@ export default function CarritoPage() {
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 text-sm font-medium">{item.name}</p>
                     <p className="text-sm text-brand-600">
-                      {formatUSD(item.priceUsd)}
+                      {formatUSD(withIva(item.priceUsd, ivaPct))}
                       {item.promoType === "2x1" && (
                         <span className="ml-2 badge bg-red-500 text-white">2x1</span>
                       )}
@@ -221,7 +235,9 @@ export default function CarritoPage() {
                         Pagas {payableCountFor(item.productId)} de {item.quantity}
                       </p>
                     )}
-                    <p className="text-xs text-ink-700/50">Abono {item.depositPct}%: {formatUSD((item.priceUsd * item.depositPct) / 100)}</p>
+                    <p className="text-xs text-ink-700/50">
+                      Abono {item.depositPct}%: {formatUSD(withIva((item.priceUsd * item.depositPct) / 100, ivaPct))}
+                    </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-2">
                     <input
@@ -279,7 +295,7 @@ export default function CarritoPage() {
                       <input type="radio" name="payment_mode" checked={paymentMode === "abono"} onChange={() => setPaymentMode("abono")} />
                       Abono ahora, resto al llegar
                     </span>
-                    <span className="font-semibold">{formatUSD(totalDeposit)}</span>
+                    <span className="font-semibold">{formatUSD(withIva(totalDeposit, ivaPct))}</span>
                   </label>
                   <label
                     className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm ${
@@ -290,7 +306,7 @@ export default function CarritoPage() {
                       <input type="radio" name="payment_mode" checked={paymentMode === "completo"} onChange={() => setPaymentMode("completo")} />
                       Pagar todo ahora
                     </span>
-                    <span className="font-semibold">{formatUSD(totalPrice)}</span>
+                    <span className="font-semibold">{formatUSD(withIva(totalPrice, ivaPct))}</span>
                   </label>
                 </div>
               </div>
@@ -344,6 +360,14 @@ export default function CarritoPage() {
                 <div className="flex justify-between text-sm text-ink-700/70">
                   <span>Envío ({DELIVERY_OPTIONS[delivery].label})</span>
                   <span>{formatUSD(deliveryCost)}</span>
+                </div>
+                <div className="flex justify-between border-t border-ink-200 pt-1 text-sm text-ink-700/70">
+                  <span>Subtotal (sin IVA)</span>
+                  <span>{formatUSD(subtotalSinIva)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-ink-700/70">
+                  <span>IVA ({ivaPct}%)</span>
+                  <span>{formatUSD(ivaAmount)}</span>
                 </div>
                 <div className="mt-1 flex justify-between border-t border-ink-200 pt-1 font-semibold text-brand-600">
                   <span>Total a pagar hoy</span>

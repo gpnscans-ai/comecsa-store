@@ -1,4 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/admin";
+import { DEFAULT_IVA_PCT } from "@/lib/tax";
 import TopBar from "@/components/store/TopBar";
 import Header from "@/components/store/Header";
 import Hero from "@/components/store/Hero";
@@ -37,6 +39,10 @@ export default async function HomePage({
 
   const { data: products } = await query;
 
+  const admin = createAdminSupabase();
+  const { data: settings } = await admin.from("business_settings").select("iva_pct").eq("id", 1).maybeSingle();
+  const ivaPct = settings?.iva_pct != null ? Number(settings.iva_pct) : DEFAULT_IVA_PCT;
+
   return (
     <div className="min-h-screen bg-[#f5f6fa]">
       <TopBar />
@@ -51,7 +57,7 @@ export default async function HomePage({
         {q && <p className="mt-4 text-center text-sm text-ink-700/60">Resultados para &quot;{q}&quot;</p>}
         <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {(products || []).map((p: Product) => (
-            <ProductCard key={p.id} product={p} />
+            <ProductCard key={p.id} product={p} ivaPct={ivaPct} />
           ))}
         </div>
         {(!products || products.length === 0) && (
