@@ -6,7 +6,7 @@ import Link from "next/link";
 import DonutChart from "@/components/admin/charts/DonutChart";
 import BarChart from "@/components/admin/charts/BarChart";
 import PipelineChart from "@/components/admin/charts/PipelineChart";
-import HorizontalBarChart from "@/components/admin/charts/HorizontalBarChart";
+import LineChart from "@/components/admin/charts/LineChart";
 
 export const dynamic = "force-dynamic";
 
@@ -161,7 +161,7 @@ export default async function AdminHome() {
 
         <div className="card p-5">
           <h2 className="mb-4 font-semibold">Ingresos últimos 6 meses</h2>
-          <BarChart
+          <LineChart
             categories={stats.monthLabels}
             series={[{ label: "Ingresos", color: "#7259B8", values: stats.revenueByMonth }]}
             formatValue={(v) => formatUSD(v)}
@@ -180,7 +180,11 @@ export default async function AdminHome() {
           {stats.sellerBars.length === 0 ? (
             <p className="text-sm text-white/40">Aún no has registrado vendedores.</p>
           ) : (
-            <HorizontalBarChart bars={stats.sellerBars} formatValue={(v) => formatUSD(v)} />
+            <BarChart
+              categories={stats.sellerBars.map((s) => s.label)}
+              series={[{ label: "Ventas", color: "#7259B8", values: stats.sellerBars.map((s) => s.value) }]}
+              formatValue={(v) => formatUSD(v)}
+            />
           )}
         </div>
       </div>
