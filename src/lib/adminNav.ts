@@ -19,6 +19,7 @@ export const ADMIN_NAV: NavItem[] = [
     ],
   },
   { href: "/admin/vendedores", label: "Vendedores", icon: "🧑‍💼" },
+  { href: "/admin/promociones", label: "Promociones", icon: "📣" },
   { href: "/admin/finanzas", label: "Finanzas", icon: "💰" },
   { href: "/admin/facturas", label: "Facturas", icon: "🧾" },
   { href: "/admin/configuracion", label: "Configuración", icon: "⚙️" },

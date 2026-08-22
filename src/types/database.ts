@@ -214,3 +214,22 @@ export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
   emitida: "Emitida (uso interno)",
   anulada: "Anulada",
 };
+
+// --- Newsletter / Promociones ---
+
+export interface NewsletterSubscriber {
+  id: string;
+  email: string;
+  active: boolean;
+  unsubscribe_token: string;
+  subscribed_at: string;
+  unsubscribed_at: string | null;
+}
+
+export interface NewsletterCampaign {
+  id: string;
+  subject: string;
+  body: string;
+  recipients_count: number;
+  sent_at: string;
+}
