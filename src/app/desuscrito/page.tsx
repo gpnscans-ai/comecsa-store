@@ -1,7 +1,18 @@
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
 import Header from "@/components/store/Header";
 
 export default function DesuscritoPage() {
+  useEffect(() => {
+    // El link de baja llega con un token ya usado; se limpia de la barra de
+    // direcciones (Netlify lo reenvía en el redirect pese a mandarlo limpio).
+    if (window.location.search) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen">
       <Header />
