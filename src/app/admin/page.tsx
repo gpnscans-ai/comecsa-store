@@ -181,57 +181,35 @@ export default async function AdminHome() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card p-5">
-          <h2 className="mb-4 font-semibold">Pipeline de pedidos</h2>
-          <FunnelChart stages={stats.pipelineStages} />
-        </div>
-
-        <div className="card p-5">
-          <h2 className="mb-4 font-semibold">Ingresos últimos 6 meses</h2>
-          <LineChart
-            categories={stats.monthLabels}
-            series={[{ label: "Ingresos", color: "#7259B8", values: stats.revenueByMonth }]}
-            formatValue={(v) => formatUSD(v)}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="card p-5">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Ventas por vendedor (este mes)</h2>
-            <Link href="/admin/vendedores" className="text-sm text-brand-400 hover:underline">
+            <h2 className="font-semibold">Pipeline de pedidos</h2>
+            <Link href="/admin/pedidos" className="text-sm text-brand-400 hover:underline">
               Ver detalle →
             </Link>
           </div>
           <div className="mt-4">
-            {stats.sellerBars.length === 0 ? (
-              <p className="text-sm text-white/40">Aún no has registrado vendedores.</p>
-            ) : (
-              <PipelineChart stages={stats.sellerBars} formatValue={(v) => formatUSD(v)} emptyLabel="Sin ventas asignadas este mes." />
-            )}
+            <FunnelChart stages={stats.pipelineStages} />
           </div>
         </div>
 
         <div className="card p-5">
-          <h2 className="mb-4 font-semibold">Artículos con mayor rotación (este mes)</h2>
-          {stats.topProducts.length === 0 ? (
-            <p className="text-sm text-white/40">Sin pedidos este mes todavía.</p>
-          ) : (
-            <BarChart
-              categories={stats.topProducts.map((p) => p.label)}
-              series={[{ label: "Unidades", color: "#7259B8", values: stats.topProducts.map((p) => p.value) }]}
-              formatValue={(v) => `${v} un.`}
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Ingresos últimos 6 meses</h2>
+            <Link href="/admin/finanzas" className="text-sm text-brand-400 hover:underline">
+              Ver detalle →
+            </Link>
+          </div>
+          <div className="mt-4">
+            <LineChart
+              categories={stats.monthLabels}
+              series={[{ label: "Ingresos", color: "#7259B8", values: stats.revenueByMonth }]}
+              formatValue={(v) => formatUSD(v)}
             />
-          )}
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="card p-5">
-          <h2 className="mb-4 font-semibold">Clientes por canal</h2>
-          <DonutChart data={stats.channelData} title="clientes" />
-        </div>
-
+      <div className="grid gap-6 lg:grid-cols-2">
         <div className="card p-5">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">Clientes con mayor saldo pendiente</h2>
@@ -249,7 +227,42 @@ export default async function AdminHome() {
         </div>
 
         <div className="card p-5">
-          <h2 className="mb-4 font-semibold">Pedidos pendientes de confirmar</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-semibold">Artículos con mayor rotación (este mes)</h2>
+            <Link href="/admin/productos" className="text-sm text-brand-400 hover:underline">
+              Ver detalle →
+            </Link>
+          </div>
+          {stats.topProducts.length === 0 ? (
+            <p className="text-sm text-white/40">Sin pedidos este mes todavía.</p>
+          ) : (
+            <BarChart
+              categories={stats.topProducts.map((p) => p.label)}
+              series={[{ label: "Unidades", color: "#7259B8", values: stats.topProducts.map((p) => p.value) }]}
+              formatValue={(v) => `${v} un.`}
+            />
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="card p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-semibold">Clientes por canal</h2>
+            <Link href="/admin/clientes" className="text-sm text-brand-400 hover:underline">
+              Ver detalle →
+            </Link>
+          </div>
+          <DonutChart data={stats.channelData} title="clientes" />
+        </div>
+
+        <div className="card p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-semibold">Pedidos pendientes de confirmar</h2>
+            <Link href="/admin/pedidos?status=pendiente" className="text-sm text-brand-400 hover:underline">
+              Ver detalle →
+            </Link>
+          </div>
           <div className="space-y-3">
             {stats.pending.length === 0 && <p className="text-sm text-white/40">No hay pedidos pendientes.</p>}
             {stats.pending.map((o: any) => (
@@ -278,6 +291,22 @@ export default async function AdminHome() {
         </div>
         <p className="mt-2 text-3xl font-bold">{stats.shippedCount}</p>
         <p className="text-sm text-white/40">pedidos en camino al cliente ahora mismo</p>
+      </div>
+
+      <div className="card p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Ventas por vendedor (este mes)</h2>
+          <Link href="/admin/vendedores" className="text-sm text-brand-400 hover:underline">
+            Ver detalle →
+          </Link>
+        </div>
+        <div className="mt-4">
+          {stats.sellerBars.length === 0 ? (
+            <p className="text-sm text-white/40">Aún no has registrado vendedores.</p>
+          ) : (
+            <PipelineChart stages={stats.sellerBars} formatValue={(v) => formatUSD(v)} emptyLabel="Sin ventas asignadas este mes." />
+          )}
+        </div>
       </div>
     </div>
   );
