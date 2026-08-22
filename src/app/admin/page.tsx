@@ -7,6 +7,7 @@ import DonutChart from "@/components/admin/charts/DonutChart";
 import BarChart from "@/components/admin/charts/BarChart";
 import PipelineChart from "@/components/admin/charts/PipelineChart";
 import LineChart from "@/components/admin/charts/LineChart";
+import FunnelChart from "@/components/admin/charts/FunnelChart";
 
 export const dynamic = "force-dynamic";
 
@@ -181,7 +182,7 @@ export default async function AdminHome() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card p-5">
           <h2 className="mb-4 font-semibold">Pipeline de pedidos</h2>
-          <PipelineChart stages={stats.pipelineStages} />
+          <FunnelChart stages={stats.pipelineStages} />
         </div>
 
         <div className="card p-5">
