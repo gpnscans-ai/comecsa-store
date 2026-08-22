@@ -27,8 +27,62 @@ export function promoBadgeLabel(product: Pick<Product, "promo_active" | "promo_t
   return "2x1";
 }
 
-// Unidades que realmente se cobran dado un promo 2x1 (cada 2da unidad es gratis).
-export function payableUnits(quantity: number, promoType?: string | null): number {
-  if (promoType === "2x1") return quantity - Math.floor(quantity / 2);
-  return quantity;
+export type Cart2x1Item = {
+  priceUsd: number;
+  quantity: number;
+  depositPct: number;
+  promoType?: string | null;
+};
+
+export type CartPricing = {
+  totalPrice: number;
+  totalDeposit: number;
+  payableCount: number[]; // unidades pagadas por línea (mismo orden que "items")
+  freeMap: boolean[][]; // freeMap[itemIndex][unidad] = true si esa unidad es gratis
+};
+
+// Empareja TODAS las unidades marcadas 2x1 del carrito (entre distintos productos
+// también): en cada par se paga la unidad más cara y la más barata (o igual) es
+// gratis, nunca al revés. Los productos sin 2x1 se cobran completos como siempre.
+export function computeCartPricing(items: Cart2x1Item[]): CartPricing {
+  type Unit = { itemIndex: number; withinIndex: number; priceUsd: number; depositPct: number };
+  const units: Unit[] = [];
+
+  items.forEach((item, itemIndex) => {
+    for (let q = 0; q < item.quantity; q++) {
+      units.push({ itemIndex, withinIndex: q, priceUsd: item.priceUsd, depositPct: item.depositPct });
+    }
+  });
+
+  const eligible = units.filter((u) => items[u.itemIndex].promoType === "2x1");
+  // Orden estable de mayor a menor precio: el índice de empate desempata para que
+  // el resultado sea determinista entre cliente y servidor.
+  const sorted = eligible
+    .map((u, sortIdx) => ({ u, sortIdx }))
+    .sort((a, b) => b.u.priceUsd - a.u.priceUsd || a.sortIdx - b.sortIdx)
+    .map((e) => e.u);
+
+  const freeMap: boolean[][] = items.map((item) => new Array(item.quantity).fill(false));
+  sorted.forEach((u, rank) => {
+    if (rank % 2 === 1) freeMap[u.itemIndex][u.withinIndex] = true;
+  });
+
+  let totalPrice = 0;
+  let totalDeposit = 0;
+  const payableCount = items.map(() => 0);
+
+  units.forEach((u) => {
+    if (!freeMap[u.itemIndex][u.withinIndex]) {
+      totalPrice += u.priceUsd;
+      totalDeposit += (u.priceUsd * u.depositPct) / 100;
+      payableCount[u.itemIndex] += 1;
+    }
+  });
+
+  return {
+    totalPrice: Math.round(totalPrice * 100) / 100,
+    totalDeposit: Math.round(totalDeposit * 100) / 100,
+    payableCount,
+    freeMap,
+  };
 }

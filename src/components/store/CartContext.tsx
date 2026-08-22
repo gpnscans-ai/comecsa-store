@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { payableUnits } from "@/lib/promo";
+import { computeCartPricing, type CartPricing } from "@/lib/promo";
 
 export interface CartItem {
   productId: string;
@@ -23,6 +23,7 @@ interface CartContextValue {
   totalPrice: number;
   totalDeposit: number;
   count: number;
+  pricing: CartPricing;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -69,18 +70,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clear = () => setItems([]);
 
-  const totalPrice = useMemo(
-    () => items.reduce((s, i) => s + i.priceUsd * payableUnits(i.quantity, i.promoType), 0),
-    [items]
-  );
-  const totalDeposit = useMemo(
-    () => items.reduce((s, i) => s + ((i.priceUsd * i.depositPct) / 100) * payableUnits(i.quantity, i.promoType), 0),
-    [items]
-  );
+  const pricing = useMemo(() => computeCartPricing(items), [items]);
+  const totalPrice = pricing.totalPrice;
+  const totalDeposit = pricing.totalDeposit;
   const count = useMemo(() => items.reduce((s, i) => s + i.quantity, 0), [items]);
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, setQuantity, clear, totalPrice, totalDeposit, count }}>
+    <CartContext.Provider value={{ items, addItem, removeItem, setQuantity, clear, totalPrice, totalDeposit, count, pricing }}>
       {children}
     </CartContext.Provider>
   );

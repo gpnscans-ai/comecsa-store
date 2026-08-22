@@ -6,7 +6,7 @@ import { getStripe } from "@/lib/stripe";
 import { chargeKushkiToken, isKushkiConfigured } from "@/lib/kushki";
 import { preparePayphoneTransaction, isPayphoneConfigured } from "@/lib/payphone";
 import { validateDiscountCode } from "@/lib/discounts";
-import { payableUnits } from "@/lib/promo";
+import { computeCartPricing, getEffectiveUnitPrice } from "@/lib/promo";
 
 // Precios fijos de envío definidos por el negocio (no se confía en el valor que mande el cliente).
 const DELIVERY_COSTS: Record<"retiro_tienda" | "domicilio", { cost: number; label: string }> = {
@@ -53,6 +53,30 @@ export async function POST(req: Request) {
 
     const supabase = createAdminSupabase();
 
+    // El precio y si el producto es 2x1 se leen del catálogo real, NUNCA del valor que
+    // manda el navegador (evita que alguien fuerce un precio menor o un 2x1 inventado).
+    const productIds = [...new Set(items.map((i) => i.productId))];
+    const { data: dbProducts } = await supabase
+      .from("products")
+      .select("id, price_usd, promo_active, promo_type, promo_value")
+      .in("id", productIds);
+    const productMap = new Map((dbProducts || []).map((p) => [p.id, p]));
+
+    const pricedItems = items.map((i) => {
+      const dbProduct = productMap.get(i.productId);
+      if (!dbProduct) return i;
+      return {
+        ...i,
+        priceUsd: getEffectiveUnitPrice(dbProduct),
+        promoType: dbProduct.promo_active && dbProduct.promo_type === "2x1" ? ("2x1" as const) : null,
+      };
+    });
+
+    // 2x1 se calcula una sola vez para todo el carrito: se emparejan TODAS las
+    // unidades marcadas 2x1 sin importar el producto, y en cada par se paga la más
+    // cara mientras la más barata (o igual) sale gratis.
+    const pricing = computeCartPricing(pricedItems);
+
     // El descuento se valida y calcula en servidor; nunca se confía en un monto que mande el cliente.
     // Solo se aplica a los productos elegibles del código (appliesToProductIds === null significa "todos").
     let appliedDiscount: { code: string; appliesToProductIds: string[] | null; factor: number } | null = null;
@@ -60,7 +84,7 @@ export async function POST(req: Request) {
     if (discountCode) {
       const result = await validateDiscountCode(
         discountCode,
-        items.map((i) => ({ productId: i.productId, priceUsd: i.priceUsd, quantity: payableUnits(i.quantity, i.promoType) }))
+        pricedItems.map((i, idx) => ({ productId: i.productId, priceUsd: i.priceUsd, quantity: pricing.payableCount[idx] }))
       );
       if (!result.valid) {
         return NextResponse.json({ error: result.error }, { status: 400 });
@@ -118,10 +142,10 @@ export async function POST(req: Request) {
 
     const orderIds: { orderId: string; depositAmount: number; name: string }[] = [];
 
-    for (const item of items) {
+    for (let itemIdx = 0; itemIdx < pricedItems.length; itemIdx++) {
+      const item = pricedItems[itemIdx];
       for (let i = 0; i < item.quantity; i++) {
-        // 2x1: cada 2da unidad (índice impar) es gratis, sin importar el código de descuento.
-        const isFreeUnit = item.promoType === "2x1" && i % 2 === 1;
+        const isFreeUnit = pricing.freeMap[itemIdx][i];
         const unitPrice = isFreeUnit ? 0 : priceForItem(item.priceUsd, item.productId);
 
         const notes = [
