@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { createServerSupabase } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
 import { chargeKushkiToken, isKushkiConfigured } from "@/lib/kushki";
 import { preparePayphoneTransaction, isPayphoneConfigured } from "@/lib/payphone";
@@ -48,14 +49,29 @@ export async function POST(req: Request) {
 
     const supabase = createAdminSupabase();
 
-    // Busca cliente existente por WhatsApp, si no existe lo crea.
-    const { data: existing } = await supabase
-      .from("customers")
-      .select("id")
-      .eq("whatsapp", customer.whatsapp)
-      .maybeSingle();
+    // Si el comprador tiene sesión iniciada, ligamos el pedido a SU cuenta real
+    // (nunca se confía en un customerId que mande el cliente en el body).
+    const sessionSupabase = await createServerSupabase();
+    const {
+      data: { user },
+    } = await sessionSupabase.auth.getUser();
 
-    let customerId = existing?.id as string | undefined;
+    let customerId: string | undefined;
+
+    if (user) {
+      const { data: ownCustomer } = await supabase.from("customers").select("id").eq("user_id", user.id).maybeSingle();
+      customerId = ownCustomer?.id;
+    }
+
+    // Si no hay sesión (o no tiene fila de cliente todavía), busca/crea por WhatsApp como invitado.
+    if (!customerId) {
+      const { data: existing } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("whatsapp", customer.whatsapp)
+        .maybeSingle();
+      customerId = existing?.id;
+    }
 
     if (!customerId) {
       const { data: created, error: customerError } = await supabase

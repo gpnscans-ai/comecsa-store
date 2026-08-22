@@ -24,7 +24,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
 
   let query = supabase
     .from("orders")
-    .select("*, customer:customers(id, full_name), order_balances(balance_due)")
+    .select("*, customer:customers(id, full_name), seller:sellers(full_name), order_balances(balance_due)")
     .order("created_at", { ascending: false });
 
   if (status) query = query.eq("status", status);
@@ -62,6 +62,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
             <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-700/50">
               <th className="px-4 py-3">Producto</th>
               <th className="px-4 py-3">Cliente</th>
+              <th className="px-4 py-3">Vendedor</th>
               <th className="px-4 py-3">Tracking</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Saldo</th>
@@ -76,6 +77,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-ink-700/70">{o.customer?.full_name}</td>
+                <td className="px-4 py-3 text-ink-700/70">{o.seller?.full_name || "—"}</td>
                 <td className="px-4 py-3 text-ink-700/70">{o.tracking_number || "—"}</td>
                 <td className="px-4 py-3">
                   <span className={`badge ${STATUS_TONE[o.status as OrderStatus]}`}>{ORDER_STATUS_LABEL[o.status as OrderStatus]}</span>
@@ -87,7 +89,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
             ))}
             {(!orders || orders.length === 0) && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-ink-700/50">Sin pedidos en este filtro.</td>
+                <td colSpan={6} className="px-4 py-8 text-center text-ink-700/50">Sin pedidos en este filtro.</td>
               </tr>
             )}
           </tbody>

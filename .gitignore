@@ -6,3 +6,5 @@ out
 .netlify
 *.log
 .DS_Store
+deno.lock
+tsconfig.tsbuildinfo

@@ -11,6 +11,7 @@ export async function createOrder(formData: FormData) {
   const payload = {
     customer_id: String(formData.get("customer_id") || ""),
     product_id: String(formData.get("product_id") || "") || null,
+    seller_id: String(formData.get("seller_id") || "") || null,
     item_name: String(formData.get("item_name") || "").trim(),
     price_usd: Number(formData.get("price_usd") || 0),
     internal_notes: String(formData.get("internal_notes") || "").trim() || null,
@@ -47,6 +48,7 @@ export async function updateOrder(formData: FormData) {
     item_name: String(formData.get("item_name") || "").trim(),
     price_usd: Number(formData.get("price_usd") || 0),
     status: (String(formData.get("status") || "pendiente") as OrderStatus),
+    seller_id: String(formData.get("seller_id") || "") || null,
     tracking_number: String(formData.get("tracking_number") || "").trim() || null,
     tracking_carrier: String(formData.get("tracking_carrier") || "").trim() || null,
     shipping_notes: String(formData.get("shipping_notes") || "").trim() || null,

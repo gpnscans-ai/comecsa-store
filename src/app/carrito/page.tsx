@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Header from "@/components/store/Header";
 import { useCart } from "@/components/store/CartContext";
 import { formatUSD } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 import KushkiCardForm from "@/components/store/KushkiCardForm";
 
 const DELIVERY_OPTIONS = {
@@ -28,6 +29,25 @@ export default function CarritoPage() {
   const [email, setEmail] = useState("");
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(async ({ data }) => {
+      const session = data.session;
+      if (!session) return;
+      const { data: own } = await supabase
+        .from("customers")
+        .select("full_name, whatsapp, email, city, address")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      if (!own) return;
+      setFullName((v) => v || own.full_name || "");
+      setWhatsapp((v) => v || own.whatsapp || "");
+      setEmail((v) => v || own.email || "");
+      setCity((v) => v || own.city || "");
+      setAddress((v) => v || own.address || "");
+    });
+  }, []);
 
   const deliveryCost = DELIVERY_OPTIONS[delivery].cost;
   const figurinesToCharge = paymentMode === "completo" ? totalPrice : totalDeposit;

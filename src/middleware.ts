@@ -37,6 +37,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (isAdminRoute && session) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).maybeSingle();
+    if (!profile || !["admin", "staff"].includes(profile.role)) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+  }
+
   if (pathname === "/admin/login" && session) {
     return NextResponse.redirect(new URL("/admin", request.url));
   }

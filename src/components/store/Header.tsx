@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PRODUCT_CATEGORY_LABEL, type ProductCategory } from "@/types/database";
 import CartButton from "./CartButton";
+import AccountMenu from "./AccountMenu";
 
 const CATEGORIES = Object.keys(PRODUCT_CATEGORY_LABEL).filter((c) => c !== "otro") as ProductCategory[];
 const LOGO_URL = "https://comecsa.ec/logo1.jpeg";
@@ -67,7 +68,8 @@ export default function Header({ activeCategory, q }: { activeCategory?: string;
 
           <div className="flex items-center gap-3">
             <CartButton />
-            <Link href="/admin" className="hidden text-xs text-ink-700/50 hover:text-brand-600 sm:inline">
+            <AccountMenu />
+            <Link href="/admin" className="hidden text-xs text-ink-700/30 hover:text-brand-600 sm:inline">
               Admin
             </Link>
           </div>

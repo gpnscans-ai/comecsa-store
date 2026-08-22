@@ -54,6 +54,7 @@ export interface Customer {
   channel: CustomerChannel;
   notes: string | null;
   tags: string[];
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +63,7 @@ export interface Order {
   id: string;
   customer_id: string;
   product_id: string | null;
+  seller_id: string | null;
   item_name: string;
   price_usd: number;
   status: OrderStatus;
@@ -70,6 +72,15 @@ export interface Order {
   shipping_notes: string | null;
   internal_notes: string | null;
   source: "web" | "admin";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Seller {
+  id: string;
+  full_name: string;
+  commission_pct: number;
+  active: boolean;
   created_at: string;
   updated_at: string;
 }

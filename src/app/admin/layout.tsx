@@ -7,6 +7,7 @@ const NAV = [
   { href: "/admin/pedidos", label: "Pedidos", icon: "📦" },
   { href: "/admin/clientes", label: "Clientes (CRM)", icon: "👥" },
   { href: "/admin/productos", label: "Catálogo", icon: "🛍️" },
+  { href: "/admin/vendedores", label: "Vendedores", icon: "🧑‍💼" },
   { href: "/admin/finanzas", label: "Finanzas", icon: "💰" },
   { href: "/admin/facturas", label: "Facturas", icon: "🧾" },
   { href: "/admin/configuracion", label: "Configuración", icon: "⚙️" },

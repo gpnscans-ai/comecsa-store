@@ -4,9 +4,10 @@ import { createOrder } from "../actions";
 export default async function NuevoPedidoPage({ searchParams }: { searchParams: Promise<{ customer_id?: string }> }) {
   const { customer_id } = await searchParams;
   const supabase = await createServerSupabase();
-  const [{ data: customers }, { data: products }] = await Promise.all([
+  const [{ data: customers }, { data: products }, { data: sellers }] = await Promise.all([
     supabase.from("customers").select("id, full_name").order("full_name"),
     supabase.from("products").select("id, name, price_usd").order("name"),
+    supabase.from("sellers").select("id, full_name").eq("active", true).order("full_name"),
   ]);
 
   return (
@@ -42,6 +43,16 @@ export default async function NuevoPedidoPage({ searchParams }: { searchParams: 
         <div>
           <label className="label" htmlFor="price_usd">Precio total (USD) *</label>
           <input className="input" id="price_usd" name="price_usd" type="number" step="0.01" min="0" required />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="seller_id">Vendedor (opcional)</label>
+          <select className="input" id="seller_id" name="seller_id" defaultValue="">
+            <option value="">— Sin asignar —</option>
+            {(sellers || []).map((s) => (
+              <option key={s.id} value={s.id}>{s.full_name}</option>
+            ))}
+          </select>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 rounded-lg border border-ink-200 p-3">

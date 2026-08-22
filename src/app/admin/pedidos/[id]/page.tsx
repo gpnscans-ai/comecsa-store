@@ -18,11 +18,10 @@ export default async function PedidoDetailPage({ params }: { params: Promise<{ i
     .single();
   if (!order) notFound();
 
-  const { data: payments } = await supabase
-    .from("payments")
-    .select("*")
-    .eq("order_id", id)
-    .order("paid_at", { ascending: false });
+  const [{ data: payments }, { data: sellers }] = await Promise.all([
+    supabase.from("payments").select("*").eq("order_id", id).order("paid_at", { ascending: false }),
+    supabase.from("sellers").select("id, full_name").eq("active", true).order("full_name"),
+  ]);
 
   const paidTotal = (payments || []).reduce((s, p) => s + Number(p.amount), 0);
   const balance = Number(order.price_usd) - paidTotal;
@@ -63,6 +62,16 @@ export default async function PedidoDetailPage({ params }: { params: Promise<{ i
             <select className="input" id="status" name="status" defaultValue={order.status}>
               {ORDER_STATUS_FLOW.concat(["cancelado"]).map((s) => (
                 <option key={s} value={s}>{ORDER_STATUS_LABEL[s]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label" htmlFor="seller_id">Vendedor</label>
+            <select className="input" id="seller_id" name="seller_id" defaultValue={order.seller_id || ""}>
+              <option value="">— Sin asignar —</option>
+              {(sellers || []).map((s) => (
+                <option key={s.id} value={s.id}>{s.full_name}</option>
               ))}
             </select>
           </div>
