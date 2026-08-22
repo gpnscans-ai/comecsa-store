@@ -5,6 +5,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
 import { chargeKushkiToken, isKushkiConfigured } from "@/lib/kushki";
 import { preparePayphoneTransaction, isPayphoneConfigured } from "@/lib/payphone";
+import { validateDiscountCode } from "@/lib/discounts";
 
 // Precios fijos de envío definidos por el negocio (no se confía en el valor que mande el cliente).
 const DELIVERY_COSTS: Record<"retiro_tienda" | "domicilio", { cost: number; label: string }> = {
@@ -40,14 +41,37 @@ const bodySchema = z.object({
     .optional()
     .nullable(),
   kushkiToken: z.string().optional().nullable(),
+  discountCode: z.string().optional().nullable(),
 });
 
 export async function POST(req: Request) {
   try {
     const json = await req.json();
-    const { customer, items, delivery, kushkiToken } = bodySchema.parse(json);
+    const { customer, items, delivery, kushkiToken, discountCode } = bodySchema.parse(json);
 
     const supabase = createAdminSupabase();
+
+    // El descuento se valida y calcula en servidor; nunca se confía en un monto que mande el cliente.
+    // Solo se aplica a los productos elegibles del código (appliesToProductIds === null significa "todos").
+    let appliedDiscount: { code: string; appliesToProductIds: string[] | null; factor: number } | null = null;
+
+    if (discountCode) {
+      const result = await validateDiscountCode(
+        discountCode,
+        items.map((i) => ({ productId: i.productId, priceUsd: i.priceUsd, quantity: i.quantity }))
+      );
+      if (!result.valid) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      const factor = result.eligibleSubtotal > 0 ? 1 - result.discountAmount / result.eligibleSubtotal : 1;
+      appliedDiscount = { code: result.code, appliesToProductIds: result.appliesToProductIds, factor };
+    }
+
+    function priceForItem(priceUsd: number, productId: string) {
+      if (!appliedDiscount) return priceUsd;
+      const isEligible = appliedDiscount.appliesToProductIds === null || appliedDiscount.appliesToProductIds.includes(productId);
+      return isEligible ? Math.round(priceUsd * appliedDiscount.factor * 100) / 100 : priceUsd;
+    }
 
     // Si el comprador tiene sesión iniciada, ligamos el pedido a SU cuenta real
     // (nunca se confía en un customerId que mande el cliente en el body).
@@ -93,6 +117,7 @@ export async function POST(req: Request) {
     const orderIds: { orderId: string; depositAmount: number; name: string }[] = [];
 
     for (const item of items) {
+      const discountedPrice = priceForItem(item.priceUsd, item.productId);
       for (let i = 0; i < item.quantity; i++) {
         const { data: order, error: orderError } = await supabase
           .from("orders")
@@ -100,17 +125,22 @@ export async function POST(req: Request) {
             customer_id: customerId,
             product_id: item.productId,
             item_name: item.name,
-            price_usd: item.priceUsd,
+            price_usd: discountedPrice,
             status: "pendiente",
             source: "web",
+            internal_notes: appliedDiscount ? `Código de descuento aplicado: ${appliedDiscount.code}` : null,
           })
           .select("id")
           .single();
         if (orderError) throw new Error(orderError.message);
 
-        const depositAmount = Math.round(((item.priceUsd * item.depositPct) / 100) * 100) / 100;
+        const depositAmount = Math.round(((discountedPrice * item.depositPct) / 100) * 100) / 100;
         orderIds.push({ orderId: order.id, depositAmount, name: item.name });
       }
+    }
+
+    if (appliedDiscount) {
+      await supabase.rpc("increment_discount_usage", { p_code: appliedDiscount.code });
     }
 
     if (delivery) {

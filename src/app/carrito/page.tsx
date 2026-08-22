@@ -30,6 +30,16 @@ export default function CarritoPage() {
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
 
+  const [discountInput, setDiscountInput] = useState("");
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    type: "percentage" | "fixed";
+    value: number;
+    appliesToProductIds: string[] | null;
+  } | null>(null);
+  const [discountError, setDiscountError] = useState<string | null>(null);
+  const [discountLoading, setDiscountLoading] = useState(false);
+
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getSession().then(async ({ data }) => {
@@ -50,11 +60,75 @@ export default function CarritoPage() {
   }, []);
 
   const deliveryCost = DELIVERY_OPTIONS[delivery].cost;
-  const figurinesToCharge = paymentMode === "completo" ? totalPrice : totalDeposit;
+
+  const eligibleItems = appliedDiscount
+    ? appliedDiscount.appliesToProductIds === null
+      ? items
+      : items.filter((i) => appliedDiscount.appliesToProductIds!.includes(i.productId))
+    : [];
+  const eligibleSubtotal = eligibleItems.reduce((s, i) => s + i.priceUsd * i.quantity, 0);
+
+  const discountAmount = appliedDiscount
+    ? appliedDiscount.type === "percentage"
+      ? Math.round(eligibleSubtotal * (appliedDiscount.value / 100) * 100) / 100
+      : Math.min(appliedDiscount.value, eligibleSubtotal)
+    : 0;
+  const discountFactor = eligibleSubtotal > 0 ? 1 - discountAmount / eligibleSubtotal : 1;
+
+  function isEligible(productId: string) {
+    return !!appliedDiscount && (appliedDiscount.appliesToProductIds === null || appliedDiscount.appliesToProductIds.includes(productId));
+  }
+
+  const discountedTotalPrice = items.reduce(
+    (s, i) => s + (isEligible(i.productId) ? i.priceUsd * discountFactor : i.priceUsd) * i.quantity,
+    0
+  );
+  const discountedTotalDeposit = items.reduce(
+    (s, i) =>
+      s + ((isEligible(i.productId) ? i.priceUsd * discountFactor : i.priceUsd) * i.depositPct) / 100 * i.quantity,
+    0
+  );
+  const originalToCharge = paymentMode === "completo" ? totalPrice : totalDeposit;
+  const figurinesToCharge = Math.round((paymentMode === "completo" ? discountedTotalPrice : discountedTotalDeposit) * 100) / 100;
+  const discountDisplayAmount = Math.round((originalToCharge - figurinesToCharge) * 100) / 100;
   const totalDepositWithDelivery = figurinesToCharge + deliveryCost;
 
   function customerIsValid() {
     return fullName.trim().length > 0 && whatsapp.trim().length >= 6;
+  }
+
+  async function applyDiscount() {
+    if (!discountInput.trim()) return;
+    setDiscountLoading(true);
+    setDiscountError(null);
+    try {
+      const res = await fetch("/api/discount/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: discountInput,
+          items: items.map((i) => ({ productId: i.productId, priceUsd: i.priceUsd, quantity: i.quantity })),
+        }),
+      });
+      const data = await res.json();
+      if (!data.valid) {
+        setAppliedDiscount(null);
+        setDiscountError(data.error || "Código no válido");
+      } else {
+        setAppliedDiscount({ code: data.code, type: data.type, value: data.value, appliesToProductIds: data.appliesToProductIds });
+        setDiscountError(null);
+      }
+    } catch {
+      setDiscountError("Error al validar el código");
+    } finally {
+      setDiscountLoading(false);
+    }
+  }
+
+  function removeDiscount() {
+    setAppliedDiscount(null);
+    setDiscountInput("");
+    setDiscountError(null);
   }
 
   async function submitOrder(kushkiToken?: string) {
@@ -79,6 +153,7 @@ export default function CarritoPage() {
           })),
           delivery: { type: delivery, cost: deliveryCost, label: DELIVERY_OPTIONS[delivery].label },
           kushkiToken: kushkiToken || undefined,
+          discountCode: appliedDiscount?.code || undefined,
         }),
       });
 
@@ -198,10 +273,51 @@ export default function CarritoPage() {
               </div>
 
               <div className="card p-5">
+                <p className="mb-3 font-semibold">Código de descuento</p>
+                {appliedDiscount ? (
+                  <div className="flex items-center justify-between rounded-lg border border-brand-500 bg-brand-50 px-3 py-2 text-sm">
+                    <span>
+                      <strong>{appliedDiscount.code}</strong> aplicado
+                      {eligibleItems.length < items.length && (
+                        <span className="text-ink-700/50"> (solo en algunos productos)</span>
+                      )}
+                    </span>
+                    <button type="button" onClick={removeDiscount} className="text-xs text-ink-700/50 hover:text-red-400">
+                      quitar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      className="input"
+                      placeholder="Ingresa tu código"
+                      value={discountInput}
+                      onChange={(e) => setDiscountInput(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={applyDiscount}
+                      disabled={discountLoading || !discountInput.trim()}
+                      className="btn-secondary shrink-0"
+                    >
+                      {discountLoading ? "..." : "Aplicar"}
+                    </button>
+                  </div>
+                )}
+                {discountError && <p className="mt-2 text-xs text-red-400">{discountError}</p>}
+              </div>
+
+              <div className="card p-5">
                 <div className="flex justify-between text-sm text-ink-700/70">
                   <span>Productos {paymentMode === "completo" ? "(pago completo)" : "(abono)"}</span>
-                  <span>{formatUSD(figurinesToCharge)}</span>
+                  <span>{formatUSD(originalToCharge)}</span>
                 </div>
+                {appliedDiscount && discountDisplayAmount > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-600">
+                    <span>Descuento ({appliedDiscount.code})</span>
+                    <span>-{formatUSD(discountDisplayAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm text-ink-700/70">
                   <span>Envío ({DELIVERY_OPTIONS[delivery].label})</span>
                   <span>{formatUSD(deliveryCost)}</span>

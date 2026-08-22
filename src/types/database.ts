@@ -233,3 +233,25 @@ export interface NewsletterCampaign {
   recipients_count: number;
   sent_at: string;
 }
+
+// --- Códigos de descuento ---
+
+export type DiscountType = "percentage" | "fixed";
+
+export interface DiscountCode {
+  id: string;
+  code: string;
+  type: DiscountType;
+  value: number;
+  active: boolean;
+  usage_limit: number | null;
+  times_used: number;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const DISCOUNT_TYPE_LABEL: Record<DiscountType, string> = {
+  percentage: "Porcentaje (%)",
+  fixed: "Monto fijo ($)",
+};

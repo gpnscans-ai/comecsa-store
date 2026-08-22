@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/supabase/server";
+import type { DiscountType } from "@/types/database";
 
 export async function sendPromotion(formData: FormData) {
   const supabase = await createServerSupabase();
@@ -63,6 +64,49 @@ export async function sendPromotion(formData: FormData) {
     .insert({ subject, body, recipients_count: sent });
   if (campaignError) throw new Error(campaignError.message);
 
+  revalidatePath("/admin/promociones");
+}
+
+export async function createDiscountCode(formData: FormData) {
+  const supabase = await createServerSupabase();
+
+  const code = String(formData.get("code") || "").trim().toUpperCase();
+  const type = String(formData.get("type") || "percentage") as DiscountType;
+  const value = Number(formData.get("value") || 0);
+  const usageLimitRaw = String(formData.get("usage_limit") || "").trim();
+  const usage_limit = usageLimitRaw ? Math.max(1, Math.round(Number(usageLimitRaw))) : null;
+  const expiresRaw = String(formData.get("expires_at") || "").trim();
+  const expires_at = expiresRaw ? new Date(`${expiresRaw}T23:59:59`).toISOString() : null;
+  const scope = String(formData.get("scope") || "all");
+  const productIds = scope === "selected" ? (formData.getAll("product_ids") as string[]) : [];
+
+  if (!code) throw new Error("Ingresa un código");
+  if (!(value > 0)) throw new Error("Ingresa un valor de descuento válido");
+  if (type === "percentage" && value > 100) throw new Error("El porcentaje no puede ser mayor a 100");
+  if (scope === "selected" && productIds.length === 0) throw new Error("Selecciona al menos un producto o elige \"Todo el catálogo\"");
+
+  const { data: created, error } = await supabase
+    .from("discount_codes")
+    .insert({ code, type, value, usage_limit, expires_at })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message.includes("duplicate") ? "Ya existe un código con ese nombre" : error.message);
+
+  if (productIds.length > 0) {
+    const rows = productIds.map((pid) => ({ discount_code_id: created.id, product_id: pid }));
+    const { error: linkError } = await supabase.from("discount_code_products").insert(rows);
+    if (linkError) throw new Error(linkError.message);
+  }
+
+  revalidatePath("/admin/promociones");
+}
+
+export async function toggleDiscountCode(formData: FormData) {
+  const supabase = await createServerSupabase();
+  const id = String(formData.get("id") || "");
+  const active = formData.get("active") === "true";
+  const { error } = await supabase.from("discount_codes").update({ active: !active }).eq("id", id);
+  if (error) throw new Error(error.message);
   revalidatePath("/admin/promociones");
 }
 
