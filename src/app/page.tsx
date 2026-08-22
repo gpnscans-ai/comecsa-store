@@ -4,6 +4,7 @@ import Header from "@/components/store/Header";
 import Hero from "@/components/store/Hero";
 import CategoryGrid from "@/components/store/CategoryGrid";
 import PromoSection from "@/components/store/PromoSection";
+import StoresSection from "@/components/store/StoresSection";
 import Footer from "@/components/store/Footer";
 import WhatsAppButton from "@/components/store/WhatsAppButton";
 import ChatWidget from "@/components/store/ChatWidget";
@@ -75,6 +76,7 @@ export default async function HomePage({
         <p className="mt-2 text-ink-700">Compromiso · Innovación · Trabajo en equipo · Servicio al cliente · Calidad · Honestidad</p>
       </section>
 
+      <StoresSection />
       <PromoSection />
       <Footer />
 

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import SocialLinks from "./SocialLinks";
 
 const PHONE = process.env.NEXT_PUBLIC_CONTACT_PHONE;
@@ -11,6 +12,9 @@ export default function Footer() {
           <h3 className="font-display text-xl font-bold">COMECSA</h3>
           <p className="mt-2 text-sm text-white/80">La Libertad - Santa Elena</p>
           <p className="text-sm text-white/80">Lunes a Domingo 09:00 - 20:00</p>
+          <Link href="/#sucursales" className="mt-2 inline-block text-sm text-white/80 underline-offset-2 hover:underline">
+            Nuestras Sucursales →
+          </Link>
         </div>
 
         <div>
