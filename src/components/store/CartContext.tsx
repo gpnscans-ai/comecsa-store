@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { payableUnits } from "@/lib/promo";
 
 export interface CartItem {
   productId: string;
@@ -10,6 +11,7 @@ export interface CartItem {
   priceUsd: number;
   depositPct: number;
   quantity: number;
+  promoType?: "2x1" | null;
 }
 
 interface CartContextValue {
@@ -67,9 +69,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clear = () => setItems([]);
 
-  const totalPrice = useMemo(() => items.reduce((s, i) => s + i.priceUsd * i.quantity, 0), [items]);
+  const totalPrice = useMemo(
+    () => items.reduce((s, i) => s + i.priceUsd * payableUnits(i.quantity, i.promoType), 0),
+    [items]
+  );
   const totalDeposit = useMemo(
-    () => items.reduce((s, i) => s + (i.priceUsd * i.depositPct) / 100 * i.quantity, 0),
+    () => items.reduce((s, i) => s + ((i.priceUsd * i.depositPct) / 100) * payableUnits(i.quantity, i.promoType), 0),
     [items]
   );
   const count = useMemo(() => items.reduce((s, i) => s + i.quantity, 0), [items]);

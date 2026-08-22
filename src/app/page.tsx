@@ -16,12 +16,13 @@ export const revalidate = 60;
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ categoria?: string; q?: string }>;
+  searchParams: Promise<{ categoria?: string; q?: string; promos?: string }>;
 }) {
   const sp = await searchParams;
   const supabase = await createServerSupabase();
   const categoria = sp.categoria as ProductCategory | undefined;
   const q = sp.q?.trim();
+  const promosOnly = sp.promos === "1";
 
   let query = supabase
     .from("products")
@@ -32,6 +33,7 @@ export default async function HomePage({
 
   if (categoria) query = query.eq("category", categoria);
   if (q) query = query.ilike("name", `%${q}%`);
+  if (promosOnly) query = query.eq("promo_active", true);
 
   const { data: products } = await query;
 
@@ -44,7 +46,7 @@ export default async function HomePage({
 
       <main id="catalogo" className="mx-auto max-w-6xl px-4 py-12">
         <h2 className="text-center text-3xl font-bold text-ink-900 sm:text-4xl">
-          {categoria ? "Catálogo" : "Nuestros productos"}
+          {promosOnly ? "Promociones" : categoria ? "Catálogo" : "Nuestros productos"}
         </h2>
         {q && <p className="mt-4 text-center text-sm text-ink-700/60">Resultados para &quot;{q}&quot;</p>}
         <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -53,7 +55,9 @@ export default async function HomePage({
           ))}
         </div>
         {(!products || products.length === 0) && (
-          <p className="py-20 text-center text-ink-700/50">No encontramos productos con ese filtro.</p>
+          <p className="py-20 text-center text-ink-700/50">
+            {promosOnly ? "Por ahora no hay productos en promoción." : "No encontramos productos con ese filtro."}
+          </p>
         )}
       </main>
 

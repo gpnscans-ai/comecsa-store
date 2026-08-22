@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { upsertProduct } from "@/app/admin/productos/actions";
-import { PRODUCT_CATEGORY_LABEL, PRODUCT_STATUS_LABEL, type Product } from "@/types/database";
+import { PRODUCT_CATEGORY_LABEL, PRODUCT_STATUS_LABEL, PROMO_TYPE_LABEL, type Product, type PromoType } from "@/types/database";
 import ImageUploader from "./ImageUploader";
 
 export default function ProductForm({ product }: { product?: Product }) {
@@ -11,6 +11,9 @@ export default function ProductForm({ product }: { product?: Product }) {
   const [sourceUrl, setSourceUrl] = useState(product?.source_url ?? "");
   const [costUsd, setCostUsd] = useState(product?.cost_usd?.toString() ?? "");
   const [imageUrl, setImageUrl] = useState(product?.image_url ?? "");
+
+  const [promoActive, setPromoActive] = useState(product?.promo_active ?? false);
+  const [promoType, setPromoType] = useState<PromoType>(product?.promo_type ?? "percentage");
 
   const [importUrl, setImportUrl] = useState("");
   const [importing, setImporting] = useState(false);
@@ -165,6 +168,60 @@ export default function ProductForm({ product }: { product?: Product }) {
               <input className="input" id="deposit_pct" name="deposit_pct" type="number" step="1" defaultValue={product?.deposit_pct ?? 40} />
             </div>
           </div>
+        </div>
+
+        <div className="rounded-lg border border-ink-200 p-3">
+          <label className="flex items-center gap-2 text-sm text-ink-700">
+            <input
+              type="checkbox"
+              name="promo_active"
+              checked={promoActive}
+              onChange={(e) => setPromoActive(e.target.checked)}
+              className="h-4 w-4 rounded border-ink-200 bg-white"
+            />
+            Este producto está en promoción
+          </label>
+
+          {promoActive && (
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="promo_type">Tipo de promoción</label>
+                <select
+                  className="input"
+                  id="promo_type"
+                  name="promo_type"
+                  value={promoType}
+                  onChange={(e) => setPromoType(e.target.value as PromoType)}
+                >
+                  {Object.entries(PROMO_TYPE_LABEL).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </div>
+              {promoType !== "2x1" && (
+                <div>
+                  <label className="label" htmlFor="promo_value">
+                    {promoType === "percentage" ? "Porcentaje de descuento (%)" : "Monto de descuento (USD)"}
+                  </label>
+                  <input
+                    className="input"
+                    id="promo_value"
+                    name="promo_value"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required={promoActive}
+                    defaultValue={product?.promo_value ?? ""}
+                  />
+                </div>
+              )}
+              {promoType === "2x1" && (
+                <p className="self-end text-xs text-ink-700/50">
+                  Cada 2da unidad que el cliente agregue al carrito es gratis, no hace falta un valor.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div>

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Header from "@/components/store/Header";
 import { useCart } from "@/components/store/CartContext";
 import { formatUSD } from "@/lib/utils";
+import { payableUnits } from "@/lib/promo";
 import { createClient } from "@/lib/supabase/client";
 import KushkiCardForm from "@/components/store/KushkiCardForm";
 
@@ -66,7 +67,7 @@ export default function CarritoPage() {
       ? items
       : items.filter((i) => appliedDiscount.appliesToProductIds!.includes(i.productId))
     : [];
-  const eligibleSubtotal = eligibleItems.reduce((s, i) => s + i.priceUsd * i.quantity, 0);
+  const eligibleSubtotal = eligibleItems.reduce((s, i) => s + i.priceUsd * payableUnits(i.quantity, i.promoType), 0);
 
   const discountAmount = appliedDiscount
     ? appliedDiscount.type === "percentage"
@@ -80,12 +81,15 @@ export default function CarritoPage() {
   }
 
   const discountedTotalPrice = items.reduce(
-    (s, i) => s + (isEligible(i.productId) ? i.priceUsd * discountFactor : i.priceUsd) * i.quantity,
+    (s, i) =>
+      s + (isEligible(i.productId) ? i.priceUsd * discountFactor : i.priceUsd) * payableUnits(i.quantity, i.promoType),
     0
   );
   const discountedTotalDeposit = items.reduce(
     (s, i) =>
-      s + ((isEligible(i.productId) ? i.priceUsd * discountFactor : i.priceUsd) * i.depositPct) / 100 * i.quantity,
+      s +
+      (((isEligible(i.productId) ? i.priceUsd * discountFactor : i.priceUsd) * i.depositPct) / 100) *
+        payableUnits(i.quantity, i.promoType),
     0
   );
   const originalToCharge = paymentMode === "completo" ? totalPrice : totalDeposit;
@@ -107,7 +111,11 @@ export default function CarritoPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: discountInput,
-          items: items.map((i) => ({ productId: i.productId, priceUsd: i.priceUsd, quantity: i.quantity })),
+          items: items.map((i) => ({
+            productId: i.productId,
+            priceUsd: i.priceUsd,
+            quantity: payableUnits(i.quantity, i.promoType),
+          })),
         }),
       });
       const data = await res.json();
@@ -150,6 +158,7 @@ export default function CarritoPage() {
             priceUsd: i.priceUsd,
             depositPct: paymentMode === "completo" ? 100 : i.depositPct,
             quantity: i.quantity,
+            promoType: i.promoType || undefined,
           })),
           delivery: { type: delivery, cost: deliveryCost, label: DELIVERY_OPTIONS[delivery].label },
           kushkiToken: kushkiToken || undefined,
@@ -197,7 +206,17 @@ export default function CarritoPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 text-sm font-medium">{item.name}</p>
-                    <p className="text-sm text-brand-600">{formatUSD(item.priceUsd)}</p>
+                    <p className="text-sm text-brand-600">
+                      {formatUSD(item.priceUsd)}
+                      {item.promoType === "2x1" && (
+                        <span className="ml-2 badge bg-red-500 text-white">2x1</span>
+                      )}
+                    </p>
+                    {item.promoType === "2x1" && item.quantity >= 2 && (
+                      <p className="text-xs text-emerald-600">
+                        Pagas {payableUnits(item.quantity, item.promoType)} de {item.quantity}
+                      </p>
+                    )}
                     <p className="text-xs text-ink-700/50">Abono {item.depositPct}%: {formatUSD((item.priceUsd * item.depositPct) / 100)}</p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-2">

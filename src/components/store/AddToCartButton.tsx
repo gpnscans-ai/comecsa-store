@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useCart } from "./CartContext";
+import { getEffectiveUnitPrice } from "@/lib/promo";
 import type { Product } from "@/types/database";
 
 export default function AddToCartButton({ product }: { product: Product }) {
@@ -16,8 +17,9 @@ export default function AddToCartButton({ product }: { product: Product }) {
       slug: product.slug,
       name: product.name,
       imageUrl: product.image_url,
-      priceUsd: product.price_usd,
+      priceUsd: getEffectiveUnitPrice(product),
       depositPct: product.deposit_pct,
+      promoType: product.promo_active && product.promo_type === "2x1" ? "2x1" : null,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);

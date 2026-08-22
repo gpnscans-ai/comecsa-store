@@ -5,6 +5,7 @@ import WhatsAppButton from "@/components/store/WhatsAppButton";
 import ChatWidget from "@/components/store/ChatWidget";
 import AddToCartButton from "@/components/store/AddToCartButton";
 import { formatUSD, whatsappLink } from "@/lib/utils";
+import { getEffectiveUnitPrice, promoBadgeLabel } from "@/lib/promo";
 import { PRODUCT_STATUS_LABEL, PRODUCT_CATEGORY_LABEL, type Product } from "@/types/database";
 
 export const revalidate = 60;
@@ -21,7 +22,10 @@ export default async function ProductoDetailPage({ params }: { params: Promise<{
 
   if (!product) notFound();
 
-  const depositAmount = (product.price_usd * product.deposit_pct) / 100;
+  const effectivePrice = getEffectiveUnitPrice(product);
+  const badge = promoBadgeLabel(product);
+  const hasPriceCut = product.promo_active && product.promo_type !== "2x1";
+  const depositAmount = (effectivePrice * product.deposit_pct) / 100;
   const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 
   return (
@@ -42,9 +46,22 @@ export default async function ProductoDetailPage({ params }: { params: Promise<{
             <div className="flex items-center gap-2">
               <span className="badge bg-ink-100 text-ink-700/70">{PRODUCT_CATEGORY_LABEL[product.category]}</span>
               <span className="badge bg-ink-100 text-ink-700/70">{PRODUCT_STATUS_LABEL[product.status]}</span>
+              {badge && <span className="badge bg-red-500 text-white">{badge}</span>}
             </div>
             <h1 className="font-display text-2xl font-bold sm:text-3xl">{product.name}</h1>
-            <p className="text-3xl font-extrabold text-brand-600">{formatUSD(product.price_usd)}</p>
+            {hasPriceCut ? (
+              <p className="flex items-baseline gap-3">
+                <span className="text-3xl font-extrabold text-brand-600">{formatUSD(effectivePrice)}</span>
+                <span className="text-lg text-ink-700/40 line-through">{formatUSD(product.price_usd)}</span>
+              </p>
+            ) : (
+              <p className="text-3xl font-extrabold text-brand-600">
+                {formatUSD(product.price_usd)}
+                {product.promo_active && product.promo_type === "2x1" && (
+                  <span className="ml-2 text-base font-normal text-ink-700/50">c/u — llévate 2 y paga 1</span>
+                )}
+              </p>
+            )}
 
             {product.sizes && (
               <p className="text-sm text-ink-700/70">📏 Tallas/números disponibles: {product.sizes}</p>
@@ -61,7 +78,7 @@ export default async function ProductoDetailPage({ params }: { params: Promise<{
 
             {whatsappNumber && (
               <a
-                href={whatsappLink(whatsappNumber, `Hola! Me interesa "${product.name}" (${formatUSD(product.price_usd)}). ¿Está disponible?`)}
+                href={whatsappLink(whatsappNumber, `Hola! Me interesa "${product.name}" (${formatUSD(effectivePrice)}). ¿Está disponible?`)}
                 target="_blank"
                 className="block text-center text-sm text-ink-700/60 hover:text-emerald-400"
               >

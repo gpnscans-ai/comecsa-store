@@ -22,6 +22,8 @@ export type PaymentMethod = "stripe" | "kushki" | "payphone" | "transferencia" |
 export type FinanceType = "gasto" | "ingreso";
 export type CustomerChannel = "whatsapp" | "instagram" | "facebook" | "tienda" | "referido" | "otro";
 
+export type PromoType = "percentage" | "fixed" | "2x1";
+
 export interface Product {
   id: string;
   name: string;
@@ -38,9 +40,18 @@ export interface Product {
   sizes: string | null;
   stock_quantity: number;
   is_published: boolean;
+  promo_active: boolean;
+  promo_type: PromoType | null;
+  promo_value: number | null;
   created_at: string;
   updated_at: string;
 }
+
+export const PROMO_TYPE_LABEL: Record<PromoType, string> = {
+  percentage: "Porcentaje de descuento",
+  fixed: "Monto fijo de descuento",
+  "2x1": "2x1 (paga 1, llévate 2)",
+};
 
 export interface Customer {
   id: string;

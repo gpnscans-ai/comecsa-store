@@ -6,6 +6,7 @@ import { getStripe } from "@/lib/stripe";
 import { chargeKushkiToken, isKushkiConfigured } from "@/lib/kushki";
 import { preparePayphoneTransaction, isPayphoneConfigured } from "@/lib/payphone";
 import { validateDiscountCode } from "@/lib/discounts";
+import { payableUnits } from "@/lib/promo";
 
 // Precios fijos de envío definidos por el negocio (no se confía en el valor que mande el cliente).
 const DELIVERY_COSTS: Record<"retiro_tienda" | "domicilio", { cost: number; label: string }> = {
@@ -29,6 +30,7 @@ const bodySchema = z.object({
         priceUsd: z.number().positive(),
         depositPct: z.number().min(0).max(100),
         quantity: z.number().int().positive().max(20),
+        promoType: z.literal("2x1").optional().nullable(),
       })
     )
     .min(1),
@@ -58,7 +60,7 @@ export async function POST(req: Request) {
     if (discountCode) {
       const result = await validateDiscountCode(
         discountCode,
-        items.map((i) => ({ productId: i.productId, priceUsd: i.priceUsd, quantity: i.quantity }))
+        items.map((i) => ({ productId: i.productId, priceUsd: i.priceUsd, quantity: payableUnits(i.quantity, i.promoType) }))
       );
       if (!result.valid) {
         return NextResponse.json({ error: result.error }, { status: 400 });
@@ -117,24 +119,34 @@ export async function POST(req: Request) {
     const orderIds: { orderId: string; depositAmount: number; name: string }[] = [];
 
     for (const item of items) {
-      const discountedPrice = priceForItem(item.priceUsd, item.productId);
       for (let i = 0; i < item.quantity; i++) {
+        // 2x1: cada 2da unidad (índice impar) es gratis, sin importar el código de descuento.
+        const isFreeUnit = item.promoType === "2x1" && i % 2 === 1;
+        const unitPrice = isFreeUnit ? 0 : priceForItem(item.priceUsd, item.productId);
+
+        const notes = [
+          isFreeUnit ? "Unidad gratis (promo 2x1)" : null,
+          appliedDiscount ? `Código de descuento aplicado: ${appliedDiscount.code}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || null;
+
         const { data: order, error: orderError } = await supabase
           .from("orders")
           .insert({
             customer_id: customerId,
             product_id: item.productId,
             item_name: item.name,
-            price_usd: discountedPrice,
+            price_usd: unitPrice,
             status: "pendiente",
             source: "web",
-            internal_notes: appliedDiscount ? `Código de descuento aplicado: ${appliedDiscount.code}` : null,
+            internal_notes: notes,
           })
           .select("id")
           .single();
         if (orderError) throw new Error(orderError.message);
 
-        const depositAmount = Math.round(((discountedPrice * item.depositPct) / 100) * 100) / 100;
+        const depositAmount = Math.round(((unitPrice * item.depositPct) / 100) * 100) / 100;
         orderIds.push({ orderId: order.id, depositAmount, name: item.name });
       }
     }
