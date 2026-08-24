@@ -144,6 +144,26 @@ export async function POST(req: Request) {
       customerId = created.id;
     }
 
+    // Descuento de stock atómico: todo o nada. Si algún producto ya no tiene
+    // suficiente stock, no se descuenta nada y se rechaza el pedido completo.
+    // Solo bloqueamos el checkout ante un error de "insufficient_stock" real —
+    // cualquier otro error (ej. falta correr la migración de esta función todavía)
+    // se registra pero NO tumba las ventas.
+    const { error: stockError } = await supabase.rpc("decrement_stock_for_order", {
+      p_items: pricedItems.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
+    });
+    if (stockError) {
+      const match = stockError.message.match(/insufficient_stock:([\w-]+)/);
+      if (match) {
+        const outOfStockItem = pricedItems.find((i) => i.productId === match[1]);
+        return NextResponse.json(
+          { error: outOfStockItem ? `Ya no queda stock suficiente de "${outOfStockItem.name}"` : "No hay stock suficiente para completar el pedido" },
+          { status: 409 }
+        );
+      }
+      console.error("decrement_stock_for_order error", stockError);
+    }
+
     const orderIds: { orderId: string; depositAmount: number; name: string }[] = [];
 
     for (let itemIdx = 0; itemIdx < pricedItems.length; itemIdx++) {

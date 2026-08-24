@@ -11,6 +11,8 @@ export default function AddToCartButton({ product }: { product: Product }) {
   const router = useRouter();
   const [added, setAdded] = useState(false);
 
+  const outOfStock = product.status === "agotado" || product.stock_quantity <= 0;
+
   function handleAdd() {
     addItem({
       productId: product.id,
@@ -23,6 +25,14 @@ export default function AddToCartButton({ product }: { product: Product }) {
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
+  }
+
+  if (outOfStock) {
+    return (
+      <button disabled className="btn-secondary w-full cursor-not-allowed opacity-50">
+        Agotado
+      </button>
+    );
   }
 
   return (
