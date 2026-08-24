@@ -16,11 +16,17 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
 
   const { data: orders } = await supabase
     .from("orders")
-    .select("*, order_balances(paid_total, balance_due)")
+    .select("*")
     .eq("customer_id", id)
     .order("created_at", { ascending: false });
 
-  const totalDue = (orders || []).reduce((sum: number, o: any) => sum + Number(o.order_balances?.[0]?.balance_due ?? o.price_usd), 0);
+  const orderIds = (orders || []).map((o) => o.id);
+  const { data: balances } = orderIds.length
+    ? await supabase.from("order_balances").select("order_id, paid_total, balance_due").in("order_id", orderIds)
+    : { data: [] as { order_id: string; paid_total: number; balance_due: number }[] };
+  const balanceMap = new Map((balances || []).map((b) => [b.order_id, b]));
+
+  const totalDue = (orders || []).reduce((sum: number, o: any) => sum + Number(balanceMap.get(o.id)?.balance_due ?? o.price_usd), 0);
 
   return (
     <div className="space-y-6">
@@ -54,7 +60,7 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
             </div>
             <div className="mt-4 space-y-2">
               {(orders || []).map((o: any) => {
-                const bal = o.order_balances?.[0];
+                const bal = balanceMap.get(o.id);
                 return (
                   <Link
                     key={o.id}

@@ -77,17 +77,21 @@ export async function GET(req: Request) {
   }
 
   if (type === "pedidos") {
-    const { data: orders } = await supabase
-      .from("orders")
-      .select("*, customer:customers(full_name, whatsapp), order_balances(paid_total, balance_due)")
-      .order("created_at", { ascending: false });
+    const [{ data: orders }, { data: orderBalances }] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("*, customer:customers(full_name, whatsapp)")
+        .order("created_at", { ascending: false }),
+      supabase.from("order_balances").select("order_id, paid_total, balance_due"),
+    ]);
+    const orderBalanceMap = new Map((orderBalances || []).map((b: any) => [b.order_id, b]));
     const rows = (orders || []).map((o: any) => ({
       Cliente: o.customer?.full_name || "",
       WhatsApp: o.customer?.whatsapp || "",
       Producto: o.item_name,
       "Precio USD": Number(o.price_usd),
-      "Pagado USD": Number(o.order_balances?.[0]?.paid_total ?? 0),
-      "Saldo USD": Number(o.order_balances?.[0]?.balance_due ?? o.price_usd),
+      "Pagado USD": Number(orderBalanceMap.get(o.id)?.paid_total ?? 0),
+      "Saldo USD": Number(orderBalanceMap.get(o.id)?.balance_due ?? o.price_usd),
       Estado: o.status,
       Tracking: o.tracking_number || "",
       Courier: o.tracking_carrier || "",

@@ -25,13 +25,17 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
 
   let query = supabase
     .from("orders")
-    .select("*, customer:customers(id, full_name), seller:sellers(full_name), order_balances(balance_due)")
+    .select("*, customer:customers(id, full_name), seller:sellers(full_name)")
     .order("created_at", { ascending: false });
 
   if (status) query = query.eq("status", status);
   if (q) query = query.ilike("item_name", `%${q}%`);
 
-  const { data: orders } = await query;
+  const [{ data: orders }, { data: balances }] = await Promise.all([
+    query,
+    supabase.from("order_balances").select("order_id, balance_due"),
+  ]);
+  const balanceMap = new Map((balances || []).map((b: any) => [b.order_id, b.balance_due]));
 
   return (
     <div className="space-y-6">
@@ -85,7 +89,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
                   <span className={`badge ${STATUS_TONE[o.status as OrderStatus]}`}>{ORDER_STATUS_LABEL[o.status as OrderStatus]}</span>
                 </td>
                 <td className="px-4 py-3 font-semibold">
-                  {formatUSD(o.order_balances?.[0]?.balance_due ?? o.price_usd)}
+                  {formatUSD(balanceMap.get(o.id) ?? o.price_usd)}
                 </td>
               </tr>
             ))}
