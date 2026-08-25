@@ -18,6 +18,7 @@ export const ADMIN_NAV: NavItem[] = [
       ...CATEGORY_ORDER.map((c) => ({ href: `/admin/productos?categoria=${c}`, label: PRODUCT_CATEGORY_LABEL[c] })),
     ],
   },
+  { href: "/admin/inventario", label: "Inventario", icon: "📋" },
   { href: "/admin/vendedores", label: "Vendedores", icon: "🧑‍💼" },
   { href: "/admin/promociones", label: "Promociones", icon: "📣" },
   { href: "/admin/finanzas", label: "Finanzas", icon: "💰" },
